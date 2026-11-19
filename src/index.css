@@ -1,0 +1,47 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --background: 224 71% 4%;
+    --foreground: 213 31% 91%;
+    --muted: 223 47% 11%;
+    --muted-foreground: 215.4 16.3% 56.9%;
+    --border: 216 34% 17%;
+    --card: 224 71% 4%;
+    --card-foreground: 213 31% 91%;
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 1.2%;
+    --accent: 216 34% 17%;
+    --accent-foreground: 210 40% 98%;
+  }
+}
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+}
+
+body {
+  background-color: #030712;
+  color: #f9fafb;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  overflow-x: hidden;
+}
+
+code, pre {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Glassmorphism & glow styles */
+.glass-panel {
+  background: rgba(17, 24, 39, 0.65);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-panel:hover {
+  border-color: rgba(56, 189, 248, 0.3);
+  box-shadow: 0 12px 32px rgba(56, 189, 248, 0.08);
+}
