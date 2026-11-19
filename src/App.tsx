@@ -114,6 +114,7 @@ export default function App() {
     <Demo
       onLogin={() => navigate("login")}
       onSignUp={() => navigate("signup")}
+      onDashboard={() => navigate("dashboard")}
     />
   );
 }
