@@ -1,15 +1,18 @@
 import { useEffect, useState } from "react";
 import { Demo } from "@/components/ui/demo";
 import { SmokeLogin } from "@/components/ui/smoke-login";
+import { DashboardPage } from "@/components/ui/dashboard-page";
 
-type Page = "home" | "login" | "signup";
+type Page = "home" | "login" | "signup" | "dashboard";
 
 export default function App() {
+  const [userEmail, setUserEmail] = useState("alex@mygit.dev");
   const [page, setPage] = useState<Page>(() => {
     if (typeof window !== "undefined") {
       const hash = window.location.hash.replace("#", "").toLowerCase();
       if (hash === "login") return "login";
       if (hash === "signup" || hash === "sign-up") return "signup";
+      if (hash === "dashboard") return "dashboard";
     }
     return "home";
   });
@@ -19,6 +22,7 @@ export default function App() {
       const hash = window.location.hash.replace("#", "").toLowerCase();
       if (hash === "login") setPage("login");
       else if (hash === "signup" || hash === "sign-up") setPage("signup");
+      else if (hash === "dashboard") setPage("dashboard");
       else setPage("home");
     };
 
@@ -35,6 +39,17 @@ export default function App() {
     }
   };
 
+  if (page === "dashboard") {
+    return (
+      <DashboardPage
+        userEmail={userEmail}
+        onSignOut={() => {
+          navigate("home");
+        }}
+      />
+    );
+  }
+
   if (page === "login") {
     return (
       <SmokeLogin
@@ -46,15 +61,15 @@ export default function App() {
         onBackHome={() => navigate("home")}
         onSubmit={async (values) => {
           console.log("Logged in:", values);
-          await new Promise((r) => setTimeout(r, 1200));
-          alert(`Welcome back, ${values.email}!`);
-          navigate("home");
+          if (values.email) setUserEmail(values.email);
+          await new Promise((r) => setTimeout(r, 600));
+          navigate("dashboard");
         }}
         onProviderSignIn={async (provider) => {
           console.log("Sign in with:", provider);
-          await new Promise((r) => setTimeout(r, 1200));
-          alert(`Signed in with ${provider}!`);
-          navigate("home");
+          setUserEmail(`alex.${provider}@mygit.dev`);
+          await new Promise((r) => setTimeout(r, 600));
+          navigate("dashboard");
         }}
         footer={
           <p className="text-[12px] text-[var(--muted)]">
@@ -76,15 +91,15 @@ export default function App() {
         onBackHome={() => navigate("home")}
         onSubmit={async (values) => {
           console.log("Signed up:", values);
-          await new Promise((r) => setTimeout(r, 1200));
-          alert(`Account created for ${values.email}!`);
-          navigate("home");
+          if (values.email) setUserEmail(values.email);
+          await new Promise((r) => setTimeout(r, 600));
+          navigate("dashboard");
         }}
         onProviderSignIn={async (provider) => {
           console.log("Sign up with:", provider);
-          await new Promise((r) => setTimeout(r, 1200));
-          alert(`Signed up with ${provider}!`);
-          navigate("home");
+          setUserEmail(`alex.${provider}@mygit.dev`);
+          await new Promise((r) => setTimeout(r, 600));
+          navigate("dashboard");
         }}
         footer={
           <p className="text-[12px] text-[var(--muted)]">

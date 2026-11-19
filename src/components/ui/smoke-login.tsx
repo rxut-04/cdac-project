@@ -102,6 +102,8 @@ export function SmokeLogin({
   const [theme, setTheme] = useState(defaultTheme);
   const [showPw, setShowPw] = useState(false);
   const [busy, setBusy] = useState(null as null | "form" | SmokeLoginProvider);
+  const [emailVal, setEmailVal] = useState(mode === "login" ? "alex@mygit.dev" : "");
+  const [pwVal, setPwVal] = useState(mode === "login" ? "gitpassword123" : "");
   const reduce = useReducedMotion();
   const dark = theme === "dark";
   const isSignUp = mode === "signup";
@@ -117,8 +119,8 @@ export function SmokeLogin({
     setBusy("form");
     try {
       await onSubmit({
-        email: String(data.get("email")),
-        password: String(data.get("password")),
+        email: String(data.get("email") || emailVal),
+        password: String(data.get("password") || pwVal),
         name: isSignUp ? String(data.get("name") || "") : undefined,
       });
     } finally {
@@ -207,7 +209,34 @@ export function SmokeLogin({
             {resolvedSubtitle}
           </motion.p>
 
-          <form onSubmit={handleSubmit} className="mt-9 space-y-4">
+          {!isSignUp && (
+            <motion.div
+              {...rise(3.3)}
+              className="mt-5 p-3 rounded-xl border border-[var(--line)] bg-[var(--field)] text-xs flex items-center justify-between gap-3 shadow-sm"
+            >
+              <div>
+                <div className="flex items-center gap-1.5 font-semibold text-[var(--ink)]">
+                  <span className="size-1.5 rounded-full bg-[var(--accent)]" />
+                  <span>Demo Credentials</span>
+                </div>
+                <p className="font-mono text-[11px] text-[var(--muted)] mt-0.5">
+                  alex@mygit.dev <span className="opacity-40">/</span> gitpassword123
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setEmailVal("alex@mygit.dev");
+                  setPwVal("gitpassword123");
+                }}
+                className="shrink-0 px-2.5 py-1 rounded-lg border border-[var(--line)] bg-[var(--paper)] text-[var(--ink)] text-[11px] font-medium hover:border-[var(--accent)] transition-all cursor-pointer"
+              >
+                Auto-fill
+              </button>
+            </motion.div>
+          )}
+
+          <form onSubmit={handleSubmit} className="mt-7 space-y-4">
             {isSignUp && (
               <motion.div {...rise(3.5)}>
                 <Label htmlFor="name">Full Name</Label>
@@ -231,6 +260,8 @@ export function SmokeLogin({
                 type="email"
                 required
                 autoComplete="email"
+                value={emailVal}
+                onChange={(e) => setEmailVal(e.target.value)}
                 placeholder="you@studio.com"
                 className={fieldCls}
               />
@@ -252,6 +283,8 @@ export function SmokeLogin({
                   type={showPw ? "text" : "password"}
                   required
                   autoComplete={isSignUp ? "new-password" : "current-password"}
+                  value={pwVal}
+                  onChange={(e) => setPwVal(e.target.value)}
                   placeholder="••••••••"
                   className={cn(fieldCls, "pr-12")}
                 />
