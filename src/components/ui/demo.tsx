@@ -1,7 +1,7 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import FigmaBrandHero from "@/components/ui/figma-brand-hero";
-import { FolderGit2, LogIn, UserPlus, X } from "lucide-react";
+import { FolderGit2, LogIn, UserPlus, X, Sun, Moon } from "lucide-react";
 import { LiquidButton } from "@/components/ui/liquid-glass-button";
 
 export default function DemoOne({
@@ -12,6 +12,28 @@ export default function DemoOne({
   onSignUp?: () => void;
 }) {
   const [authModal, setAuthModal] = useState<"login" | "signup" | null>(null);
+  const [theme, setTheme] = useState<"light" | "dark">(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("mygit-theme");
+      if (saved === "light" || saved === "dark") return saved;
+      if (document.documentElement.classList.contains("dark")) return "dark";
+      if (window.matchMedia("(prefers-color-scheme: dark)").matches) return "dark";
+    }
+    return "light";
+  });
+
+  useEffect(() => {
+    if (theme === "dark") {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+    localStorage.setItem("mygit-theme", theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme((prev) => (prev === "dark" ? "light" : "dark"));
+  };
 
   const handleSignIn = () => {
     if (onSignIn) {
@@ -58,8 +80,22 @@ export default function DemoOne({
           </a>
         </nav>
 
-        {/* Navbar Quick Auth Buttons (Liquid Glass) */}
-        <div className="flex items-center gap-2.5">
+        {/* Navbar Actions: Theme Toggle & Quick Auth Buttons */}
+        <div className="flex items-center gap-2 sm:gap-3">
+          {/* Light / Dark Mode Toggle */}
+          <button
+            onClick={toggleTheme}
+            aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+            className="flex items-center justify-center w-8 h-8 rounded-xl border border-neutral-300/80 dark:border-neutral-700/80 bg-neutral-100/70 dark:bg-neutral-900/70 hover:bg-neutral-200/80 dark:hover:bg-neutral-800/80 text-neutral-800 dark:text-neutral-200 shadow-xs transition-all cursor-pointer"
+            title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+          >
+            {theme === "dark" ? (
+              <Sun className="w-4 h-4 text-[#b8ff3c] transition-transform hover:rotate-45" />
+            ) : (
+              <Moon className="w-4 h-4 text-neutral-700 transition-transform hover:-rotate-12" />
+            )}
+          </button>
+
           <LiquidButton
             size="sm"
             onClick={handleSignIn}
