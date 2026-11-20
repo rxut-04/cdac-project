@@ -1,7 +1,7 @@
 "use client";
 import React, { useState } from "react";
 import FigmaBrandHero from "@/components/ui/figma-brand-hero";
-import { FolderGit2, LogIn, UserPlus, X, ShieldCheck, Zap, GitBranch } from "lucide-react";
+import { FolderGit2, LogIn, UserPlus, X } from "lucide-react";
 
 export default function DemoOne() {
   const [authModal, setAuthModal] = useState<"login" | "signup" | null>(null);
@@ -9,23 +9,18 @@ export default function DemoOne() {
   return (
     <div className="relative min-h-screen w-full flex flex-col justify-between bg-[#f8f9f5] dark:bg-[#07090e] bg-[linear-gradient(to_right,#e5e7eb_1px,transparent_1px),linear-gradient(to_bottom,#e5e7eb_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,#1b202c_1px,transparent_1px),linear-gradient(to_bottom,#1b202c_1px,transparent_1px)] bg-[size:24px_24px] text-neutral-900 dark:text-neutral-100 transition-colors duration-300 overflow-x-hidden">
       
-      {/* Top Navbar */}
+      {/* Minimalist Top Navbar */}
       <header className="sticky top-0 z-40 w-full px-6 sm:px-12 py-4 bg-white/70 dark:bg-neutral-950/70 backdrop-blur-md border-b border-neutral-200/80 dark:border-neutral-800/80 flex items-center justify-between">
         {/* Brand Logo */}
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-[#c8ff29] dark:bg-[#b8ff3c] flex items-center justify-center shadow-sm">
-            <FolderGit2 className="w-5 h-5 text-neutral-950" />
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-[#c8ff29] dark:bg-[#b8ff3c] flex items-center justify-center">
+            <FolderGit2 className="w-4.5 h-4.5 text-neutral-950" />
           </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-xl font-black tracking-tight text-neutral-950 dark:text-white">mygit</span>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-neutral-200/80 dark:bg-neutral-800/80 text-neutral-700 dark:text-neutral-300 font-semibold">
-              personal git
-            </span>
-          </div>
+          <span className="text-lg font-black tracking-tight text-neutral-950 dark:text-white">mygit</span>
         </div>
 
         {/* Navigation Links */}
-        <nav className="hidden md:flex items-center gap-7 text-xs font-semibold text-neutral-600 dark:text-neutral-300">
+        <nav className="hidden md:flex items-center gap-7 text-xs font-medium text-neutral-600 dark:text-neutral-300">
           <a href="#repos" className="hover:text-neutral-950 dark:hover:text-[#b8ff3c] transition-colors">
             Repositories
           </a>
@@ -36,22 +31,22 @@ export default function DemoOne() {
             CLI Engine
           </a>
           <a href="#docs" className="hover:text-neutral-950 dark:hover:text-[#b8ff3c] transition-colors">
-            Documentation
+            Docs
           </a>
         </nav>
 
         {/* Navbar Quick Auth Buttons */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
           <button
             onClick={() => setAuthModal("login")}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-transparent hover:bg-neutral-200/60 dark:hover:bg-neutral-800/60 text-xs font-semibold text-neutral-800 dark:text-neutral-200 transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-200/50 dark:hover:bg-neutral-800/50 transition-colors cursor-pointer"
           >
             <LogIn className="w-3.5 h-3.5" />
             <span>Sign In</span>
           </button>
           <button
             onClick={() => setAuthModal("signup")}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#c8ff29] dark:bg-[#b8ff3c] hover:bg-[#b5f01e] text-neutral-950 text-xs font-bold shadow-xs transition-transform hover:scale-105 active:scale-95 cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#c8ff29] dark:bg-[#b8ff3c] hover:bg-[#b5f01e] text-neutral-950 text-xs font-bold transition-all hover:scale-105 active:scale-95 cursor-pointer"
           >
             <UserPlus className="w-3.5 h-3.5" />
             <span>Sign Up</span>
@@ -67,26 +62,10 @@ export default function DemoOne() {
         />
       </main>
 
-      {/* Footer Feature Badges */}
-      <footer className="w-full px-6 sm:px-12 py-3.5 bg-white/50 dark:bg-neutral-950/50 backdrop-blur-xs border-t border-neutral-200/60 dark:border-neutral-800/60 flex flex-wrap items-center justify-between text-[11px] text-neutral-500 dark:text-neutral-400">
-        <div className="flex items-center gap-6">
-          <span className="inline-flex items-center gap-1.5">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-            <span>100% Byte-Compatible with Git</span>
-          </span>
-          <span className="hidden sm:inline-flex items-center gap-1.5">
-            <Zap className="w-3.5 h-3.5 text-amber-500" />
-            <span>Sub-millisecond SHA-1 Object Store</span>
-          </span>
-          <span className="hidden md:inline-flex items-center gap-1.5">
-            <GitBranch className="w-3.5 h-3.5 text-indigo-500" />
-            <span>Automated 3-Way Merge Engine</span>
-          </span>
-        </div>
-
-        <div className="font-mono text-[10px] text-neutral-400 dark:text-neutral-500">
-          Personal GitHub Platform · Distributed VCS
-        </div>
+      {/* Minimal Bottom Bar */}
+      <footer className="w-full px-6 sm:px-12 py-3 border-t border-neutral-200/60 dark:border-neutral-800/60 flex items-center justify-between text-[11px] text-neutral-400">
+        <span>mygit VCS</span>
+        <span className="font-mono text-[10px]">v1.0.0</span>
       </footer>
 
       {/* Interactive Modal for Login & Sign Up */}
@@ -103,7 +82,7 @@ export default function DemoOne() {
 
             {/* Modal Header */}
             <div className="flex items-center gap-3 mb-6">
-              <div className="w-11 h-11 rounded-2xl bg-[#c8ff29] dark:bg-[#b8ff3c] flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-[#c8ff29] dark:bg-[#b8ff3c] flex items-center justify-center">
                 <FolderGit2 className="w-5 h-5 text-neutral-950" />
               </div>
               <div>
@@ -112,8 +91,8 @@ export default function DemoOne() {
                 </h3>
                 <p className="text-xs text-neutral-500 dark:text-neutral-400">
                   {authModal === "login"
-                    ? "Access your self-hosted Git repositories"
-                    : "Join your personal GitHub platform in seconds"}
+                    ? "Access your Git repositories"
+                    : "Get started with mygit in seconds"}
                 </p>
               </div>
             </div>
@@ -167,7 +146,7 @@ export default function DemoOne() {
 
               <button
                 type="submit"
-                className="w-full py-3.5 rounded-xl bg-[#c8ff29] dark:bg-[#b8ff3c] hover:bg-[#b5f01e] text-neutral-950 font-black text-sm shadow-md transition-all mt-2 cursor-pointer flex items-center justify-center gap-2"
+                className="w-full py-3 rounded-xl bg-[#c8ff29] dark:bg-[#b8ff3c] hover:bg-[#b5f01e] text-neutral-950 font-bold text-sm shadow-sm transition-all mt-2 cursor-pointer flex items-center justify-center gap-2"
               >
                 {authModal === "login" ? (
                   <>
