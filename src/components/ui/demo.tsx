@@ -65,12 +65,6 @@ export default function DemoOne() {
         />
       </main>
 
-      {/* Minimal Bottom Bar */}
-      <footer className="w-full px-6 sm:px-12 py-3 border-t border-neutral-200/60 dark:border-neutral-800/60 flex items-center justify-between text-[11px] text-neutral-400">
-        <span>mygit VCS</span>
-        <span className="font-mono text-[10px]">v1.0.0</span>
-      </footer>
-
       {/* Interactive Modal for Login & Sign Up */}
       {authModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4">
