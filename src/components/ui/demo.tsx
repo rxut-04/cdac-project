@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import FigmaBrandHero from "@/components/ui/figma-brand-hero";
 import { FolderGit2, LogIn, UserPlus, X } from "lucide-react";
+import { LiquidButton } from "@/components/ui/liquid-glass-button";
 
 export default function DemoOne() {
   const [authModal, setAuthModal] = useState<"login" | "signup" | null>(null);
@@ -10,7 +11,7 @@ export default function DemoOne() {
     <div className="relative min-h-screen w-full flex flex-col justify-between bg-[#f8f9f5] dark:bg-[#07090e] bg-[linear-gradient(to_right,#e5e7eb_1px,transparent_1px),linear-gradient(to_bottom,#e5e7eb_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,#1b202c_1px,transparent_1px),linear-gradient(to_bottom,#1b202c_1px,transparent_1px)] bg-[size:24px_24px] text-neutral-900 dark:text-neutral-100 transition-colors duration-300 overflow-x-hidden">
       
       {/* Minimalist Top Navbar */}
-      <header className="sticky top-0 z-40 w-full px-6 sm:px-12 py-4 bg-white/70 dark:bg-neutral-950/70 backdrop-blur-md border-b border-neutral-200/80 dark:border-neutral-800/80 flex items-center justify-between">
+      <header className="sticky top-0 z-40 w-full px-6 sm:px-12 py-3.5 bg-white/70 dark:bg-neutral-950/70 backdrop-blur-md border-b border-neutral-200/80 dark:border-neutral-800/80 flex items-center justify-between">
         {/* Brand Logo */}
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-[#c8ff29] dark:bg-[#b8ff3c] flex items-center justify-center">
@@ -35,22 +36,24 @@ export default function DemoOne() {
           </a>
         </nav>
 
-        {/* Navbar Quick Auth Buttons */}
-        <div className="flex items-center gap-2">
-          <button
+        {/* Navbar Quick Auth Buttons (Liquid Glass) */}
+        <div className="flex items-center gap-2.5">
+          <LiquidButton
+            size="sm"
             onClick={() => setAuthModal("login")}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-200/50 dark:hover:bg-neutral-800/50 transition-colors cursor-pointer"
+            className="!rounded-xl text-xs font-semibold text-neutral-800 dark:text-neutral-200 bg-neutral-100/70 dark:bg-neutral-900/70 border border-neutral-300/80 dark:border-neutral-700/80 hover:bg-neutral-200/80"
           >
             <LogIn className="w-3.5 h-3.5" />
             <span>Sign In</span>
-          </button>
-          <button
+          </LiquidButton>
+          <LiquidButton
+            size="sm"
             onClick={() => setAuthModal("signup")}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#c8ff29] dark:bg-[#b8ff3c] hover:bg-[#b5f01e] text-neutral-950 text-xs font-bold transition-all hover:scale-105 active:scale-95 cursor-pointer"
+            className="!rounded-xl text-xs font-bold text-neutral-950 bg-[#c8ff29] dark:bg-[#b8ff3c] hover:bg-[#b5f01e] border border-neutral-900/60 shadow-xs"
           >
-            <UserPlus className="w-3.5 h-3.5" />
+            <UserPlus className="w-3.5 h-3.5 text-neutral-950" />
             <span>Sign Up</span>
-          </button>
+          </LiquidButton>
         </div>
       </header>
 
@@ -144,9 +147,10 @@ export default function DemoOne() {
                 </div>
               )}
 
-              <button
+              <LiquidButton
                 type="submit"
-                className="w-full py-3 rounded-xl bg-[#c8ff29] dark:bg-[#b8ff3c] hover:bg-[#b5f01e] text-neutral-950 font-bold text-sm shadow-sm transition-all mt-2 cursor-pointer flex items-center justify-center gap-2"
+                size="lg"
+                className="w-full !rounded-xl bg-[#c8ff29] dark:bg-[#b8ff3c] hover:bg-[#b5f01e] text-neutral-950 font-black text-sm shadow-md transition-all mt-2 cursor-pointer flex items-center justify-center gap-2"
               >
                 {authModal === "login" ? (
                   <>
@@ -159,7 +163,7 @@ export default function DemoOne() {
                     <span>Create Account</span>
                   </>
                 )}
-              </button>
+              </LiquidButton>
 
               <div className="text-center pt-2 text-xs text-neutral-500 dark:text-neutral-400">
                 {authModal === "login" ? (

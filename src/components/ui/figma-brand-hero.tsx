@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { LogIn, UserPlus, ArrowRight, Terminal, Copy, Check } from "lucide-react";
+import { LiquidButton } from "@/components/ui/liquid-glass-button";
 
 export interface FigmaBrandHeroProps {
   onSignIn?: () => void;
@@ -77,31 +78,33 @@ export default function FigmaBrandHero({ onSignIn, onSignUp }: FigmaBrandHeroPro
         </motion.span>
       </div>
 
-      {/* The Two Minimalist Action Buttons */}
+      {/* The Two Liquid Glass Action Buttons */}
       <motion.div
         initial={{ y: 15, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.6, delay: 0.55, ease: [0.16, 1, 0.3, 1] }}
-        className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3.5 w-full max-w-sm z-20"
+        className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4 w-full max-w-md z-20"
       >
-        {/* Sign Up Button (Primary) */}
-        <button
+        {/* Sign Up Button (Primary) with Liquid Glass Effect */}
+        <LiquidButton
+          size="lg"
           onClick={onSignUp}
-          className="w-full sm:w-1/2 flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-[#c8ff29] dark:bg-[#b8ff3c] hover:bg-[#b5f01e] text-neutral-950 font-bold text-sm border border-neutral-900 shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer group select-none"
+          className="w-full sm:w-1/2 !rounded-2xl font-black text-sm text-neutral-950 dark:text-neutral-950 bg-[#c8ff29] dark:bg-[#b8ff3c] hover:bg-[#b5f01e] border border-neutral-900 shadow-lg shadow-[#b8ff3c]/20 transition-all hover:scale-[1.03] active:scale-[0.98] cursor-pointer"
         >
           <UserPlus className="w-4 h-4 text-neutral-950" />
           <span>Sign Up</span>
-          <ArrowRight className="w-3.5 h-3.5 ml-0.5 group-hover:translate-x-0.5 transition-transform" />
-        </button>
+          <ArrowRight className="w-3.5 h-3.5 ml-0.5" />
+        </LiquidButton>
 
-        {/* Sign In Button (Secondary) */}
-        <button
+        {/* Sign In Button (Secondary) with Liquid Glass Effect */}
+        <LiquidButton
+          size="lg"
           onClick={onSignIn}
-          className="w-full sm:w-1/2 flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-900 dark:text-white font-semibold text-sm border border-neutral-300 dark:border-neutral-700 shadow-xs transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer group select-none"
+          className="w-full sm:w-1/2 !rounded-2xl font-bold text-sm text-neutral-900 dark:text-white bg-white/85 dark:bg-neutral-900/85 hover:bg-white dark:hover:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 shadow-md backdrop-blur-md transition-all hover:scale-[1.03] active:scale-[0.98] cursor-pointer"
         >
           <LogIn className="w-4 h-4 text-neutral-700 dark:text-neutral-300" />
           <span>Sign In</span>
-        </button>
+        </LiquidButton>
       </motion.div>
 
       {/* Minimalist Terminal Pill */}
