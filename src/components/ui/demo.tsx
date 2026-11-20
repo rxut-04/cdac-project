@@ -116,13 +116,14 @@ export default function DemoOne({
             <LogIn className="w-3.5 h-3.5" />
             <span>Sign In</span>
           </LiquidButton>
-          <AntiMetalButton
+          <LiquidButton
+            size="sm"
             onClick={handleSignUp}
-            className="!h-8 !w-28 !rounded-xl text-xs font-bold"
-            accentFrom="#c8ff29"
-            accentTo="#b8ff3c"
-            label="Sign Up"
-          />
+            className="!rounded-xl text-xs font-bold text-neutral-950 bg-[#c8ff29] dark:bg-[#b8ff3c] hover:bg-[#b5f01e] border border-neutral-900/60 shadow-xs"
+          >
+            <UserPlus className="w-3.5 h-3.5 text-neutral-950" />
+            <span>Sign Up</span>
+          </LiquidButton>
         </div>
       </header>
 

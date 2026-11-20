@@ -79,29 +79,29 @@ export default function FigmaBrandHero({ onSignIn, onSignUp }: FigmaBrandHeroPro
         </motion.span>
       </div>
 
-      {/* Action Buttons: AntiMetal for Sign Up, Liquid Glass for Sign In */}
+      {/* Action Buttons: Half-width on mobile side-by-side, fixed width on sm+ */}
       <motion.div
         initial={{ y: 15, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.6, delay: 0.55, ease: [0.16, 1, 0.3, 1] }}
-        className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4 w-full max-w-md z-20"
+        className="mt-8 flex flex-row items-center justify-center gap-3 sm:gap-4 w-full max-w-[340px] sm:max-w-md z-20"
       >
-        {/* Sign Up Button (AntiMetalButton theme) */}
+        {/* Sign Up Button (AntiMetalButton theme, half width on mobile) */}
         <AntiMetalButton
           onClick={onSignUp}
-          className="w-full sm:w-44 !h-11 !rounded-xl text-sm font-bold shadow-lg cursor-pointer"
+          className="w-1/2 sm:w-44 !h-11 !rounded-xl text-xs sm:text-sm font-bold shadow-lg cursor-pointer"
           accentFrom="#c8ff29"
           accentTo="#b8ff3c"
           label="Sign Up"
         />
 
-        {/* Sign In Button (Liquid Glass Button) */}
+        {/* Sign In Button (Liquid Glass Button, half width on mobile) */}
         <LiquidButton
           size="lg"
           onClick={onSignIn}
-          className="w-full sm:w-44 !h-11 !rounded-xl font-bold text-sm text-neutral-900 dark:text-white bg-white/85 dark:bg-neutral-900/85 hover:bg-white dark:hover:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 shadow-md backdrop-blur-md transition-all hover:scale-[1.03] active:scale-[0.98] cursor-pointer"
+          className="w-1/2 sm:w-44 !h-11 !rounded-xl font-bold text-xs sm:text-sm text-neutral-900 dark:text-white bg-white/85 dark:bg-neutral-900/85 hover:bg-white dark:hover:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 shadow-md backdrop-blur-md transition-all hover:scale-[1.03] active:scale-[0.98] cursor-pointer"
         >
-          <LogIn className="w-4 h-4 text-neutral-700 dark:text-neutral-300" />
+          <LogIn className="w-3.5 sm:w-4 h-3.5 sm:h-4 text-neutral-700 dark:text-neutral-300" />
           <span>Sign In</span>
         </LiquidButton>
       </motion.div>
