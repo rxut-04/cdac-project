@@ -140,9 +140,9 @@ export function SmokeLogin({
 
   // Each block drifts up out of a blur, one after another.
   const rise = (i: number) => ({
-    initial: reduce ? { opacity: 0 } : { opacity: 0, y: 10, filter: "blur(10px)" },
-    animate: { opacity: 1, y: 0, filter: "blur(0px)" },
-    transition: { duration: 0.9, delay: 0.15 + i * 0.07, ease: [0.22, 1, 0.36, 1] as const },
+    initial: { opacity: 0, y: 10 },
+    animate: { opacity: 1, y: 0 },
+    transition: { duration: 0.5, delay: 0.05 + i * 0.05, ease: [0.22, 1, 0.36, 1] as const },
   });
 
   return (

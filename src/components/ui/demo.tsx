@@ -4,8 +4,30 @@ import FigmaBrandHero from "@/components/ui/figma-brand-hero";
 import { FolderGit2, LogIn, UserPlus, X } from "lucide-react";
 import { LiquidButton } from "@/components/ui/liquid-glass-button";
 
-export default function DemoOne() {
+export default function DemoOne({
+  onSignIn,
+  onSignUp,
+}: {
+  onSignIn?: () => void;
+  onSignUp?: () => void;
+}) {
   const [authModal, setAuthModal] = useState<"login" | "signup" | null>(null);
+
+  const handleSignIn = () => {
+    if (onSignIn) {
+      onSignIn();
+    } else {
+      setAuthModal("login");
+    }
+  };
+
+  const handleSignUp = () => {
+    if (onSignUp) {
+      onSignUp();
+    } else {
+      setAuthModal("signup");
+    }
+  };
 
   return (
     <div className="relative min-h-screen w-full flex flex-col justify-between bg-[#f8f9f5] dark:bg-[#07090e] bg-[linear-gradient(to_right,#e5e7eb_1px,transparent_1px),linear-gradient(to_bottom,#e5e7eb_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,#1b202c_1px,transparent_1px),linear-gradient(to_bottom,#1b202c_1px,transparent_1px)] bg-[size:24px_24px] text-neutral-900 dark:text-neutral-100 transition-colors duration-300 overflow-x-hidden">
@@ -40,7 +62,7 @@ export default function DemoOne() {
         <div className="flex items-center gap-2.5">
           <LiquidButton
             size="sm"
-            onClick={() => setAuthModal("login")}
+            onClick={handleSignIn}
             className="!rounded-xl text-xs font-semibold text-neutral-800 dark:text-neutral-200 bg-neutral-100/70 dark:bg-neutral-900/70 border border-neutral-300/80 dark:border-neutral-700/80 hover:bg-neutral-200/80"
           >
             <LogIn className="w-3.5 h-3.5" />
@@ -48,7 +70,7 @@ export default function DemoOne() {
           </LiquidButton>
           <LiquidButton
             size="sm"
-            onClick={() => setAuthModal("signup")}
+            onClick={handleSignUp}
             className="!rounded-xl text-xs font-bold text-neutral-950 bg-[#c8ff29] dark:bg-[#b8ff3c] hover:bg-[#b5f01e] border border-neutral-900/60 shadow-xs"
           >
             <UserPlus className="w-3.5 h-3.5 text-neutral-950" />
@@ -60,8 +82,8 @@ export default function DemoOne() {
       {/* Main Hero Container */}
       <main className="flex-1 flex items-center justify-center p-4 sm:p-8">
         <FigmaBrandHero
-          onSignIn={() => setAuthModal("login")}
-          onSignUp={() => setAuthModal("signup")}
+          onSignIn={handleSignIn}
+          onSignUp={handleSignUp}
         />
       </main>
 
