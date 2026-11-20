@@ -1,8 +1,9 @@
 "use client";
 import React, { useState } from "react";
 import { motion } from "framer-motion";
-import { LogIn, UserPlus, ArrowRight, Terminal, Copy, Check } from "lucide-react";
+import { LogIn, Terminal, Copy, Check } from "lucide-react";
 import { LiquidButton } from "@/components/ui/liquid-glass-button";
+import { AntiMetalButton } from "@/components/ui/anti-metal-button";
 
 export interface FigmaBrandHeroProps {
   onSignIn?: () => void;
@@ -78,29 +79,27 @@ export default function FigmaBrandHero({ onSignIn, onSignUp }: FigmaBrandHeroPro
         </motion.span>
       </div>
 
-      {/* The Two Liquid Glass Action Buttons */}
+      {/* Action Buttons: AntiMetal for Sign Up, Liquid Glass for Sign In */}
       <motion.div
         initial={{ y: 15, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.6, delay: 0.55, ease: [0.16, 1, 0.3, 1] }}
         className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4 w-full max-w-md z-20"
       >
-        {/* Sign Up Button (Primary) with Liquid Glass Effect */}
-        <LiquidButton
-          size="lg"
+        {/* Sign Up Button (AntiMetalButton theme) */}
+        <AntiMetalButton
           onClick={onSignUp}
-          className="w-full sm:w-1/2 !rounded-2xl font-black text-sm text-neutral-950 dark:text-neutral-950 bg-[#c8ff29] dark:bg-[#b8ff3c] hover:bg-[#b5f01e] border border-neutral-900 shadow-lg shadow-[#b8ff3c]/20 transition-all hover:scale-[1.03] active:scale-[0.98] cursor-pointer"
-        >
-          <UserPlus className="w-4 h-4 text-neutral-950" />
-          <span>Sign Up</span>
-          <ArrowRight className="w-3.5 h-3.5 ml-0.5" />
-        </LiquidButton>
+          className="w-full sm:w-44 !h-11 !rounded-xl text-sm font-bold shadow-lg cursor-pointer"
+          accentFrom="#c8ff29"
+          accentTo="#b8ff3c"
+          label="Sign Up"
+        />
 
-        {/* Sign In Button (Secondary) with Liquid Glass Effect */}
+        {/* Sign In Button (Liquid Glass Button) */}
         <LiquidButton
           size="lg"
           onClick={onSignIn}
-          className="w-full sm:w-1/2 !rounded-2xl font-bold text-sm text-neutral-900 dark:text-white bg-white/85 dark:bg-neutral-900/85 hover:bg-white dark:hover:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 shadow-md backdrop-blur-md transition-all hover:scale-[1.03] active:scale-[0.98] cursor-pointer"
+          className="w-full sm:w-44 !h-11 !rounded-xl font-bold text-sm text-neutral-900 dark:text-white bg-white/85 dark:bg-neutral-900/85 hover:bg-white dark:hover:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 shadow-md backdrop-blur-md transition-all hover:scale-[1.03] active:scale-[0.98] cursor-pointer"
         >
           <LogIn className="w-4 h-4 text-neutral-700 dark:text-neutral-300" />
           <span>Sign In</span>

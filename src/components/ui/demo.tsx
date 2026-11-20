@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import FigmaBrandHero from "@/components/ui/figma-brand-hero";
 import { FolderGit2, LogIn, UserPlus, X, Sun, Moon } from "lucide-react";
 import { LiquidButton } from "@/components/ui/liquid-glass-button";
+import { AntiMetalButton } from "@/components/ui/anti-metal-button";
 
 export default function DemoOne({
   onSignIn,
@@ -104,14 +105,13 @@ export default function DemoOne({
             <LogIn className="w-3.5 h-3.5" />
             <span>Sign In</span>
           </LiquidButton>
-          <LiquidButton
-            size="sm"
+          <AntiMetalButton
             onClick={handleSignUp}
-            className="!rounded-xl text-xs font-bold text-neutral-950 bg-[#c8ff29] dark:bg-[#b8ff3c] hover:bg-[#b5f01e] border border-neutral-900/60 shadow-xs"
-          >
-            <UserPlus className="w-3.5 h-3.5 text-neutral-950" />
-            <span>Sign Up</span>
-          </LiquidButton>
+            className="!h-8 !w-28 !rounded-xl text-xs font-bold"
+            accentFrom="#c8ff29"
+            accentTo="#b8ff3c"
+            label="Sign Up"
+          />
         </div>
       </header>
 
