@@ -2889,6 +2889,19 @@ export function DashboardPage({
           </div>
 
           <div className="flex items-center gap-3">
+            {/* Toggle back to Landing Page */}
+            {onSignOut && (
+              <button
+                type="button"
+                onClick={onSignOut}
+                title="Toggle back to Landing Page"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-border/60 hover:border-accent-pro/50 bg-foreground/5 hover:bg-foreground/10 text-xs text-foreground/80 font-medium transition-all cursor-pointer"
+              >
+                <Globe className="size-3.5 text-accent-pro" />
+                <span className="hidden sm:inline">Landing Page</span>
+              </button>
+            )}
+
             <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-md border border-border/50 bg-foreground/5 text-xs text-foreground/50 w-52">
               <Search className="size-3.5" />
               <span>Search...</span>

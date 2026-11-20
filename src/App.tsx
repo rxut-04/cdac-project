@@ -114,6 +114,7 @@ export default function App() {
     <DemoOne
       onSignIn={() => navigate("login")}
       onSignUp={() => navigate("signup")}
+      onDashboard={() => navigate("dashboard")}
     />
   );
 }
