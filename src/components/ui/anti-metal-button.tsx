@@ -100,10 +100,12 @@ export const AntiMetalButton = React.forwardRef<
           }
         `}</style>
 
-        <span className="absolute inset-y-0 right-4 flex items-center text-[14px] font-semibold tracking-tight text-white dark:text-[#0a0a0a]">
+        {/* Perfectly centered text across the button body */}
+        <span className="absolute inset-0 flex items-center justify-center pl-7 pr-1 text-[14px] font-bold tracking-tight text-white dark:text-[#0a0a0a] group-hover/btn:text-neutral-950 transition-colors z-20 pointer-events-none select-none">
           {content}
         </span>
 
+        {/* Sliding animated double chevrons */}
         <span
           aria-hidden="true"
           className="absolute bottom-1 left-1 top-1 z-10 flex w-9 items-center justify-start gap-2.5 overflow-hidden rounded-md pl-3 pr-2.5 transition-[width,gap] duration-200 ease-[cubic-bezier(0.65,0,0.35,1)] group-hover/btn:w-[calc(100%-0.5rem)]"

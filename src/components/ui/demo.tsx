@@ -29,11 +29,22 @@ export default function DemoOne({
     } else {
       document.documentElement.classList.remove("dark");
     }
+    document.documentElement.style.colorScheme = theme;
     localStorage.setItem("mygit-theme", theme);
   }, [theme]);
 
   const toggleTheme = () => {
-    setTheme((prev) => (prev === "dark" ? "light" : "dark"));
+    setTheme((prev) => {
+      const nextTheme = prev === "dark" ? "light" : "dark";
+      if (nextTheme === "dark") {
+        document.documentElement.classList.add("dark");
+      } else {
+        document.documentElement.classList.remove("dark");
+      }
+      document.documentElement.style.colorScheme = nextTheme;
+      localStorage.setItem("mygit-theme", nextTheme);
+      return nextTheme;
+    });
   };
 
   const handleSignIn = () => {

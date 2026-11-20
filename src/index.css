@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -16,17 +18,17 @@
 }
 
 :root {
-  --background: #090d12;
-  --foreground: #f3f4f6;
-  --muted: #1e2631;
-  --muted-foreground: #8a99a8;
-  --border: #1b232e;
-  --card: #0e141d;
-  --card-foreground: #f3f4f6;
-  --primary: #f9fafb;
-  --primary-foreground: #090d12;
-  --accent: #1e2631;
-  --accent-foreground: #f3f4f6;
+  --background: #f8f9fa;
+  --foreground: #090d12;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+  --border: #e2e8f0;
+  --card: #ffffff;
+  --card-foreground: #090d12;
+  --primary: #090d12;
+  --primary-foreground: #ffffff;
+  --accent: #f1f5f9;
+  --accent-foreground: #090d12;
   --accent-pro: #f12e54;
 }
 
@@ -49,13 +51,20 @@ html, body, #root {
   margin: 0;
   padding: 0;
   width: 100%;
+  min-height: 100%;
 }
 
 body {
-  background-color: #030712;
-  color: #f9fafb;
+  background-color: #f8f9fa;
+  color: #090d12;
   font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
   overflow-x: hidden;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+html.dark body, .dark body {
+  background-color: #07090e;
+  color: #f9fafb;
 }
 
 code, pre {
