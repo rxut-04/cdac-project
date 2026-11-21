@@ -24,7 +24,7 @@ export default function FigmaBrandHero({ onSignIn, onSignUp }: FigmaBrandHeroPro
   return (
     <div className="relative w-full max-w-4xl mx-auto flex flex-col items-center justify-center min-h-[calc(100svh-90px)] py-8 sm:py-16 px-4 sm:px-12">
       {/* Main Bold Stack */}
-      <div className="flex flex-col items-center font-black tracking-tighter text-3xl sm:text-6xl md:text-7xl text-neutral-950 dark:text-white leading-[0.9] text-center select-none z-10 mt-16 sm:mt-20 md:mt-24 lg:mt-28">
+      <div className="flex flex-col items-center font-black tracking-tighter text-3xl sm:text-6xl md:text-7xl text-neutral-950 dark:text-white leading-[0.9] text-center select-none z-10 mt-2 sm:mt-4 md:mt-6">
         <motion.span
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
@@ -85,7 +85,7 @@ export default function FigmaBrandHero({ onSignIn, onSignUp }: FigmaBrandHeroPro
         initial={{ y: 15, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.6, delay: 0.5, ease: [0.16, 1, 0.3, 1] }}
-        className="mt-6 sm:mt-7 flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl bg-white/90 dark:bg-neutral-900/90 border border-neutral-200 dark:border-neutral-800 text-xs font-mono text-neutral-800 dark:text-neutral-200 shadow-xs select-none z-20 max-w-[92vw] sm:max-w-none overflow-x-auto"
+        className="mt-6 sm:mt-7 flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl bg-white/90 dark:bg-neutral-900/90 border border-neutral-200 dark:border-neutral-800 text-xs font-mono text-neutral-800 dark:text-neutral-200 shadow-xs select-none z-20 max-w-[92vw] sm:max-w-none overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         <Terminal className="w-3.5 h-3.5 text-neutral-500 shrink-0" />
         <span className="whitespace-nowrap font-medium">{commandText}</span>
