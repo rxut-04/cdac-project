@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import FigmaBrandHero from "@/components/ui/figma-brand-hero";
-import { FolderGit2, GitBranch, LogIn, UserPlus, X, Sun, Moon, LayoutDashboard } from "lucide-react";
+import { FolderGit2, GitBranch, LogIn, UserPlus, X, Sun, Moon } from "lucide-react";
 import { LiquidButton } from "@/components/ui/liquid-glass-button";
 import { AntiMetalButton } from "@/components/ui/anti-metal-button";
 import CompareUILib, { type ComparisonData } from "@/components/ui/shadcn-studio-compare-07";
@@ -168,22 +168,8 @@ export default function DemoOne({
           </a>
         </nav>
 
-        {/* Navbar Actions: Dashboard Toggle, Theme Toggle & Quick Auth Buttons */}
+        {/* Navbar Actions: Theme Toggle */}
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* Dashboard Toggle Button */}
-          <button
-            onClick={() => {
-              if (onDashboard) onDashboard();
-              else window.location.hash = "dashboard";
-            }}
-            aria-label="Toggle Dashboard"
-            title="Toggle Dashboard"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-neutral-300/80 dark:border-neutral-700/80 bg-neutral-100/70 dark:bg-neutral-900/70 hover:bg-neutral-200/80 dark:hover:bg-neutral-800/80 text-neutral-800 dark:text-neutral-200 text-xs font-semibold shadow-xs transition-all cursor-pointer hover:border-[#b8ff3c]/50 active:scale-95"
-          >
-            <LayoutDashboard className="w-3.5 h-3.5 text-[#b8ff3c]" />
-            <span className="hidden sm:inline">Dashboard</span>
-          </button>
-
           {/* Light / Dark Mode Toggle */}
           <button
             onClick={toggleTheme}
