@@ -13,9 +13,20 @@ export interface FigmaBrandHeroProps {
 export default function FigmaBrandHero({ onSignIn, onSignUp }: FigmaBrandHeroProps) {
   const [copied, setCopied] = useState(false);
 
+  const getCommand = () => {
+    if (typeof window !== "undefined") {
+      if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+        return `irm ${window.location.origin}/install.ps1 | iex`;
+      }
+    }
+    return "irm https://velvety-druid-dccd85.netlify.app/install.ps1 | iex";
+  };
+
+  const commandText = getCommand();
+
   const copyCommand = (e: React.MouseEvent) => {
     e.stopPropagation();
-    navigator.clipboard.writeText("pip install mygit-vcs && mygit init");
+    navigator.clipboard.writeText(commandText);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -79,12 +90,30 @@ export default function FigmaBrandHero({ onSignIn, onSignUp }: FigmaBrandHeroPro
         </motion.span>
       </div>
 
+      {/* Minimalist Terminal Pill: Right after Hero's H1 headline stack */}
+      <motion.div
+        initial={{ y: 15, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.6, delay: 0.5, ease: [0.16, 1, 0.3, 1] }}
+        className="mt-6 sm:mt-7 flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl bg-white/90 dark:bg-neutral-900/90 border border-neutral-200 dark:border-neutral-800 text-xs font-mono text-neutral-800 dark:text-neutral-200 shadow-xs select-none z-20 max-w-[92vw] sm:max-w-none overflow-x-auto"
+      >
+        <Terminal className="w-3.5 h-3.5 text-neutral-500 shrink-0" />
+        <span className="whitespace-nowrap font-medium">{commandText}</span>
+        <button
+          onClick={copyCommand}
+          className="ml-1 p-1 hover:text-neutral-950 dark:hover:text-white text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-md transition-all cursor-pointer shrink-0"
+          title="Copy command"
+        >
+          {copied ? <Check className="w-3.5 h-3.5 text-emerald-500 dark:text-[#b8ff3c]" /> : <Copy className="w-3.5 h-3.5" />}
+        </button>
+      </motion.div>
+
       {/* Action Buttons: Half-width on mobile side-by-side, fixed width on sm+ */}
       <motion.div
         initial={{ y: 15, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.6, delay: 0.55, ease: [0.16, 1, 0.3, 1] }}
-        className="mt-8 flex flex-row items-center justify-center gap-3 sm:gap-4 w-full max-w-[340px] sm:max-w-md z-20"
+        className="mt-6 sm:mt-7 flex flex-row items-center justify-center gap-3 sm:gap-4 w-full max-w-[340px] sm:max-w-md z-20"
       >
         {/* Sign Up Button (AntiMetalButton theme, half width on mobile) */}
         <AntiMetalButton
@@ -104,24 +133,6 @@ export default function FigmaBrandHero({ onSignIn, onSignUp }: FigmaBrandHeroPro
           <LogIn className="w-3.5 sm:w-4 h-3.5 sm:h-4 text-neutral-700 dark:text-neutral-300" />
           <span>Sign In</span>
         </LiquidButton>
-      </motion.div>
-
-      {/* Minimalist Terminal Pill */}
-      <motion.div
-        initial={{ y: 15, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.6, delay: 0.65, ease: [0.16, 1, 0.3, 1] }}
-        className="mt-5 flex items-center gap-2.5 px-3.5 py-1.5 rounded-lg bg-white/90 dark:bg-neutral-900/90 border border-neutral-200 dark:border-neutral-800 text-xs font-mono text-neutral-700 dark:text-neutral-300 shadow-xs select-none z-20"
-      >
-        <Terminal className="w-3.5 h-3.5 text-neutral-500" />
-        <span>pip install mygit-vcs</span>
-        <button
-          onClick={copyCommand}
-          className="ml-1 p-0.5 hover:text-neutral-950 dark:hover:text-white text-neutral-400 transition-colors cursor-pointer"
-          title="Copy command"
-        >
-          {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
-        </button>
       </motion.div>
     </div>
   );

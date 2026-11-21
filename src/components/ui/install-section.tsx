@@ -20,7 +20,7 @@ export function InstallSection() {
     if (typeof window !== "undefined") {
       return window.location.origin;
     }
-    return "https://mygit.netlify.app";
+    return "https://velvety-druid-dccd85.netlify.app";
   };
 
   const origin = getOrigin();

@@ -38,7 +38,7 @@ if (!(Test-Path -Path $InstallDir)) {
 }
 
 # 2. Download Package
-$PackageUrl = "https://mygit.netlify.app/mygit-package.zip"
+$PackageUrl = "https://velvety-druid-dccd85.netlify.app/mygit-package.zip"
 Write-Host "==> Downloading mygit engine from $PackageUrl..." -ForegroundColor Yellow
 
 try {
