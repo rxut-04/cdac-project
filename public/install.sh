@@ -1,50 +1,59 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# mygit Unix/macOS Automated Installer
-# Usage: curl -fsSL https://mygit.netlify.app/install.sh | bash
+# mygit Linux/macOS Automated Installer
+# Usage: curl -fsSL https://velvety-druid-dccd85.netlify.app/install.sh | bash
 # ==============================================================================
 set -e
 
 INSTALL_DIR="${HOME}/.local/bin"
-TARGET="${INSTALL_DIR}/mygit"
+MYGIT_HOME="${HOME}/.mygit"
+ZIP_TARGET="/tmp/mygit-package.zip"
+PACKAGE_URL="https://velvety-druid-dccd85.netlify.app/mygit-package.zip"
 
 echo ""
 echo -e "\033[1;36m >> Installing mygit CLI for Linux/macOS...\033[0m"
 
 mkdir -p "${INSTALL_DIR}"
+mkdir -p "${MYGIT_HOME}"
 
-# Download or create launcher
+echo -e "\033[1;33m==> Downloading mygit engine from ${PACKAGE_URL}...\033[0m"
+if command -v curl >/dev/null 2>&1; then
+    curl -fsSL "${PACKAGE_URL}" -o "${ZIP_TARGET}"
+elif command -v wget >/dev/null 2>&1; then
+    wget -q "${PACKAGE_URL}" -O "${ZIP_TARGET}"
+else
+    python3 -c "import urllib.request; urllib.request.urlretrieve('${PACKAGE_URL}', '${ZIP_TARGET}')"
+fi
+
+echo -e "\033[1;32m✓ Download complete. Extracting package...\033[0m"
+python3 -m zipfile -e "${ZIP_TARGET}" "${MYGIT_HOME}" 2>/dev/null || unzip -q -o "${ZIP_TARGET}" -d "${MYGIT_HOME}"
+rm -f "${ZIP_TARGET}"
+
+TARGET="${INSTALL_DIR}/mygit"
 cat << 'EOF' > "${TARGET}"
 #!/usr/bin/env bash
-if command -v python3 >/dev/null 2>&1; then
-    exec python3 -c "
-import urllib.request, sys
-code = urllib.request.urlopen('https://mygit.netlify.app/mygit_cli').read().decode('utf-8')
-exec(code)
-" "$@"
-else
-    echo "Python 3 is required to run mygit"
-    exit 1
-fi
+exec python3 "${HOME}/.mygit/mygit_cli" "$@"
 EOF
 
 chmod +x "${TARGET}"
+chmod +x "${MYGIT_HOME}/mygit_cli" 2>/dev/null || true
 
-# Add to PATH in shell profile if not present
-DETECTED_RC=""
-if [ -n "$ZSH_VERSION" ] || [ -f "$HOME/.zshrc" ]; then
-    DETECTED_RC="$HOME/.zshrc"
-elif [ -f "$HOME/.bashrc" ]; then
-    DETECTED_RC="$HOME/.bashrc"
-fi
-
-if [ -n "$DETECTED_RC" ]; then
-    if ! grep -q '.local/bin' "$DETECTED_RC"; then
-        echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$DETECTED_RC"
-        echo -e "\033[1;32m✓ Added ~/.local/bin to PATH in $DETECTED_RC\033[0m"
+# Add to PATH in shell configuration files if needed
+for rc in "${HOME}/.bashrc" "${HOME}/.zshrc" "${HOME}/.profile"; do
+    if [ -f "$rc" ]; then
+        if ! grep -q '.local/bin' "$rc"; then
+            echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$rc"
+            echo -e "\033[1;32m✓ Added ~/.local/bin to PATH in $rc\033[0m"
+        fi
     fi
-fi
+done
 
-echo -e "\033[1;32m✓ mygit installed successfully to ${TARGET}\033[0m"
-echo -e "\033[1;33mRun 'mygit --help' or 'mygit login' to get started.\033[0m"
+export PATH="${INSTALL_DIR}:${PATH}"
+
+echo ""
+echo -e "\033[1;32m================================================================"
+echo -e " 🎉 mygit was successfully installed on your system!"
+echo -e "================================================================\033[0m"
+echo ""
+echo -e " Run \033[1;36mmygit whoami\033[0m or \033[1;36mmygit login\033[0m to get started."
 echo ""

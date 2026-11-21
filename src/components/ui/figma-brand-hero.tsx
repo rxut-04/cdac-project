@@ -1,7 +1,7 @@
 "use client";
 import React, { useState } from "react";
 import { motion } from "framer-motion";
-import { LogIn, Terminal, Copy, Check } from "lucide-react";
+import { LogIn, Terminal, Copy, Check, Command } from "lucide-react";
 import { LiquidButton } from "@/components/ui/liquid-glass-button";
 import { AntiMetalButton } from "@/components/ui/anti-metal-button";
 
@@ -11,12 +11,16 @@ export interface FigmaBrandHeroProps {
 }
 
 export default function FigmaBrandHero({ onSignIn, onSignUp }: FigmaBrandHeroProps) {
+  const [os, setOs] = useState<"win" | "linux">("win");
   const [copied, setCopied] = useState(false);
-  const commandText = "irm https://velvety-druid-dccd85.netlify.app/install.ps1 | iex";
+
+  const winCmd = "irm https://velvety-druid-dccd85.netlify.app/install.ps1 | iex";
+  const linuxCmd = "curl -fsSL https://velvety-druid-dccd85.netlify.app/install.sh | bash";
+  const activeCmd = os === "win" ? winCmd : linuxCmd;
 
   const copyCommand = (e: React.MouseEvent) => {
     e.stopPropagation();
-    navigator.clipboard.writeText(commandText);
+    navigator.clipboard.writeText(activeCmd);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -80,22 +84,53 @@ export default function FigmaBrandHero({ onSignIn, onSignUp }: FigmaBrandHeroPro
         </motion.span>
       </div>
 
-      {/* Minimalist Terminal Pill: Right after Hero's H1 headline stack */}
+      {/* Minimalist Terminal Pill with Windows & Linux tabs: Right after Hero's H1 headline stack */}
       <motion.div
         initial={{ y: 15, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.6, delay: 0.5, ease: [0.16, 1, 0.3, 1] }}
-        className="mt-6 sm:mt-7 flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl bg-white/90 dark:bg-neutral-900/90 border border-neutral-200 dark:border-neutral-800 text-xs font-mono text-neutral-800 dark:text-neutral-200 shadow-xs select-none z-20 max-w-[92vw] sm:max-w-none overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="mt-5 sm:mt-6 flex flex-col items-center gap-2 select-none z-20 max-w-[94vw] sm:max-w-none"
       >
-        <Terminal className="w-3.5 h-3.5 text-neutral-500 shrink-0" />
-        <span className="whitespace-nowrap font-medium">{commandText}</span>
-        <button
-          onClick={copyCommand}
-          className="ml-1 p-1 hover:text-neutral-950 dark:hover:text-white text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-md transition-all cursor-pointer shrink-0"
-          title="Copy command"
-        >
-          {copied ? <Check className="w-3.5 h-3.5 text-emerald-500 dark:text-[#b8ff3c]" /> : <Copy className="w-3.5 h-3.5" />}
-        </button>
+        {/* OS switcher tabs */}
+        <div className="flex items-center p-0.5 rounded-lg bg-neutral-200/60 dark:bg-neutral-800/60 border border-neutral-300/60 dark:border-neutral-700/60 text-[11px] font-medium backdrop-blur-sm">
+          <button
+            type="button"
+            onClick={() => setOs("win")}
+            className={`px-3 py-1 rounded-md transition-all cursor-pointer flex items-center gap-1.5 ${
+              os === "win"
+                ? "bg-white dark:bg-neutral-900 text-neutral-950 dark:text-white font-semibold shadow-2xs"
+                : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white"
+            }`}
+          >
+            <Terminal className="w-3 h-3 text-neutral-500" />
+            <span>Windows (PowerShell)</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setOs("linux")}
+            className={`px-3 py-1 rounded-md transition-all cursor-pointer flex items-center gap-1.5 ${
+              os === "linux"
+                ? "bg-white dark:bg-neutral-900 text-neutral-950 dark:text-white font-semibold shadow-2xs"
+                : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white"
+            }`}
+          >
+            <Command className="w-3 h-3 text-neutral-500" />
+            <span>Linux & macOS (curl)</span>
+          </button>
+        </div>
+
+        {/* Command Pill */}
+        <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-white/90 dark:bg-neutral-900/90 border border-neutral-200 dark:border-neutral-800 text-xs font-mono text-neutral-800 dark:text-neutral-200 shadow-xs max-w-[92vw] sm:max-w-none overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <span className="text-neutral-400 font-bold shrink-0">&gt;_</span>
+          <span className="whitespace-nowrap font-medium">{activeCmd}</span>
+          <button
+            onClick={copyCommand}
+            className="ml-1 p-1 hover:text-neutral-950 dark:hover:text-white text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-md transition-all cursor-pointer shrink-0"
+            title="Copy command"
+          >
+            {copied ? <Check className="w-3.5 h-3.5 text-emerald-500 dark:text-[#b8ff3c]" /> : <Copy className="w-3.5 h-3.5" />}
+          </button>
+        </div>
       </motion.div>
 
       {/* Action Buttons: Half-width on mobile side-by-side, fixed width on sm+ */}
