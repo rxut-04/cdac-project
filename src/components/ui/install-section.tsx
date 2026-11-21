@@ -171,6 +171,15 @@ export function InstallSection() {
 
           <div className="space-y-3 text-[11px] sm:text-xs">
             <div>
+              <span className="text-neutral-500">PS C:\&gt;</span> <span className="text-white font-medium">mygit</span>
+              <div className="text-neutral-400 text-[11px] mt-1 pl-3 border-l border-neutral-800 space-y-0.5">
+                <div className="text-cyan-400 font-semibold">Welcome to the mygit Dedicated Shell</div>
+                <div className="text-neutral-300">Created by: Om Raut (CDAC Pass Out Student)</div>
+                <div className="text-neutral-500">Type &apos;help&apos; to list commands or &apos;exit&apos; to quit.</div>
+              </div>
+            </div>
+
+            <div>
               <span className="text-neutral-500">PS C:\&gt;</span> <span className="text-white font-medium">mygit login</span>
               <div className="text-neutral-400 text-[11px] mt-0.5 pl-3 border-l border-neutral-800">
                 Email: oraut860@gmail.com<br />

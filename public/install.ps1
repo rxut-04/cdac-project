@@ -20,6 +20,7 @@ function Write-BrandHeader {
     Write-Host "\_/  /_/  /_/  \____|_____|\_____| " -ForegroundColor Cyan
     Write-Host ""
     Write-Host " >> Decentralized, Byte-Compatible Version Control Platform" -ForegroundColor DarkGray
+    Write-Host " >> Created by Om Raut (CDAC Pass Out Student)" -ForegroundColor Yellow
     Write-Host " >> Automated Windows Environment Setup" -ForegroundColor DarkGray
     Write-Host ""
 }
@@ -119,6 +120,7 @@ try {
 Write-Host ""
 Write-Host "================================================================" -ForegroundColor Green
 Write-Host " 🎉 mygit has been successfully installed on your Windows machine!" -ForegroundColor Green
+Write-Host " 🚀 Created with ❤️ by Om Raut (CDAC Pass Out Student)" -ForegroundColor Cyan
 Write-Host "================================================================" -ForegroundColor Green
 Write-Host ""
 Write-Host " You can now use mygit anywhere from any command line:" -ForegroundColor White
