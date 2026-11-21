@@ -197,23 +197,6 @@ export default function DemoOne({
               <Moon className="w-4 h-4 text-neutral-700 transition-transform hover:-rotate-12" />
             )}
           </button>
-
-          <LiquidButton
-            size="sm"
-            onClick={handleSignIn}
-            className="!rounded-xl text-xs font-semibold text-neutral-800 dark:text-neutral-200 bg-neutral-100/70 dark:bg-neutral-900/70 border border-neutral-300/80 dark:border-neutral-700/80 hover:bg-neutral-200/80"
-          >
-            <LogIn className="w-3.5 h-3.5" />
-            <span>Sign In</span>
-          </LiquidButton>
-          <LiquidButton
-            size="sm"
-            onClick={handleSignUp}
-            className="!rounded-xl text-xs font-bold text-neutral-950 bg-[#c8ff29] dark:bg-[#b8ff3c] hover:bg-[#b5f01e] border border-neutral-900/60 shadow-xs"
-          >
-            <UserPlus className="w-3.5 h-3.5 text-neutral-950" />
-            <span>Sign Up</span>
-          </LiquidButton>
         </div>
       </header>
 
