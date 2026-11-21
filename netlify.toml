@@ -2,6 +2,39 @@
   command = "npm run build"
   publish = "dist"
 
+[[headers]]
+  for = "/install.ps1"
+  [headers.values]
+    Content-Type = "text/plain; charset=utf-8"
+    Cache-Control = "public, max-age=300"
+    Access-Control-Allow-Origin = "*"
+
+[[headers]]
+  for = "/install.sh"
+  [headers.values]
+    Content-Type = "text/plain; charset=utf-8"
+    Cache-Control = "public, max-age=300"
+    Access-Control-Allow-Origin = "*"
+
+[[headers]]
+  for = "/mygit-package.zip"
+  [headers.values]
+    Content-Type = "application/zip"
+    Cache-Control = "public, max-age=600"
+    Access-Control-Allow-Origin = "*"
+
+# Direct installer routes
+[[redirects]]
+  from = "/win"
+  to = "/install.ps1"
+  status = 200
+
+[[redirects]]
+  from = "/unix"
+  to = "/install.sh"
+  status = 200
+
+# SPA catch-all fallback
 [[redirects]]
   from = "/*"
   to = "/index.html"

@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { repoApi } from "@/lib/api";
 import {
   Sidebar001,
   Sidebar001Content,
@@ -143,6 +144,39 @@ export function DashboardPage({
       lastAction: "Pushed 3 days ago",
     },
   ]);
+
+  // Sync repositories from Spring Boot backend (Neon PostgreSQL)
+  useEffect(() => {
+    let isMounted = true;
+    repoApi
+      .list()
+      .then((backendRepos) => {
+        if (!isMounted) return;
+        if (backendRepos && backendRepos.length > 0) {
+          const mapped = backendRepos.map((r) => ({
+            id: String(r.id),
+            name: r.name,
+            description: r.description || "No description provided.",
+            lang: "Rust",
+            langColor: "bg-orange-500",
+            stars: 0,
+            forks: 0,
+            isStarred: false,
+            updated: "Just now",
+            isPrivate: r.isPrivate,
+            lastAction: "Created in Neon Cloud",
+          }));
+          setRepos(mapped);
+        }
+      })
+      .catch((err) => {
+        console.debug("Backend repo sync error:", err);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Notifications State
   const [notifications, setNotifications] = useState([
@@ -439,27 +473,38 @@ export function DashboardPage({
   const isDuplicateName = repos.some((r) => r.name.toLowerCase() === newRepoName.trim().toLowerCase());
   const isValidRepoName = /^[a-zA-Z0-9_.-]+$/.test(newRepoName.trim());
 
-  const handleCreateRepo = (e: React.FormEvent) => {
+  const handleCreateRepo = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newRepoName.trim() || isDuplicateName || !isValidRepoName) return;
 
-    const newR = {
-      id: String(Date.now()),
-      name: newRepoName.trim(),
-      description: newRepoDesc.trim() || "No description provided.",
-      lang: "Rust",
-      langColor: "bg-orange-500",
-      stars: 0,
-      forks: 0,
-      isStarred: false,
-      updated: "Just now",
-      isPrivate: newRepoPrivate,
-      lastAction: "Created just now",
-    };
+    try {
+      const created = await repoApi.create({
+        name: newRepoName.trim(),
+        description: newRepoDesc.trim(),
+        isPrivate: newRepoPrivate,
+      });
 
-    setRepos((prev) => [newR, ...prev]);
-    setCreatedRepoSetup(newR.name);
-    showToast(`Repository ${newR.name} created successfully!`);
+      const newR = {
+        id: String(created.id),
+        name: created.name,
+        description: created.description || "No description provided.",
+        lang: "Rust",
+        langColor: "bg-orange-500",
+        stars: 0,
+        forks: 0,
+        isStarred: false,
+        updated: "Just now",
+        isPrivate: created.isPrivate,
+        lastAction: "Created in Neon Cloud",
+      };
+
+      setRepos((prev) => [newR, ...prev.filter((r) => r.name !== newR.name)]);
+      setCreatedRepoSetup(newR.name);
+      showToast(`Repository ${newR.name} created and saved to Neon DB!`);
+    } catch (err: any) {
+      const msg = err.response?.data?.error || err.message || "Failed to create repository";
+      showToast(`Error: ${msg}`);
+    }
   };
 
   // -------------------------------------------------------------

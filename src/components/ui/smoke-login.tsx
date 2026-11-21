@@ -27,6 +27,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { ArrowLeft, ArrowRight, Eye, EyeOff, LoaderCircle, Moon, Sun, AlertCircle } from "lucide-react";
 import { useClerk, useSignIn, useSignUp } from "@clerk/react";
 import { cn } from "@/lib/utils";
+import { authApi } from "@/lib/api";
 
 export type SmokeLoginProvider = "apple" | "google";
 type Theme = "light" | "dark";
@@ -150,24 +151,36 @@ export function SmokeLogin({
       return;
     }
 
-    // 2. Sign In flow with Clerk
+    // 2. Sign In flow with Spring Boot Backend & JWT
     if (!isSignUp) {
       setBusy("form");
       try {
+        // Authenticate with Spring Boot backend (Neon Postgres)
+        try {
+          await authApi.login(emailVal, pwVal);
+        } catch (apiErr: any) {
+          const errMsg = apiErr.response?.data?.error || apiErr.message || "Invalid credentials";
+          setErrorMsg(errMsg);
+          setBusy(null);
+          return;
+        }
+
+        // Optional sync with Clerk if active
         if (signIn?.create) {
-          const result = await signIn.create({
-            identifier: emailVal,
-            password: pwVal,
-          });
-          if (result.status === "complete") {
-            await clerk.setActive({ session: result.createdSessionId });
-            await onSubmit({ email: emailVal, password: pwVal });
-            return;
-          } else {
-            console.log("Additional sign-in requirement:", result.status);
+          try {
+            const result = await signIn.create({
+              identifier: emailVal,
+              password: pwVal,
+            });
+            if (result.status === "complete") {
+              await clerk.setActive({ session: result.createdSessionId });
+            }
+          } catch (clerkErr) {
+            // Spring Boot backend auth succeeded with isolated token
+            console.debug("Clerk session optional sync:", clerkErr);
           }
         }
-        await onSubmit({ email: emailVal, password: pwVal });
+        await onSubmit?.({ email: emailVal, password: pwVal });
       } catch (err: unknown) {
         const clerkErr = err as { errors?: Array<{ message: string }>; message?: string };
         setErrorMsg(clerkErr.errors?.[0]?.message || clerkErr.message || "Invalid credentials");
@@ -177,31 +190,45 @@ export function SmokeLogin({
       return;
     }
 
-    // 3. Sign Up flow with Clerk
+    // 3. Sign Up flow with Spring Boot Backend & JWT
     if (isSignUp) {
       setBusy("form");
       try {
-        if (signUp?.create) {
-          const [firstName, ...rest] = nameVal.trim().split(" ");
-          const lastName = rest.join(" ");
-          const result = await signUp.create({
-            emailAddress: emailVal,
-            password: pwVal,
-            firstName: firstName || undefined,
-            lastName: lastName || undefined,
-          });
+        const derivedUsername =
+          (nameVal.trim() || emailVal.split("@")[0])
+            .toLowerCase()
+            .replace(/[^a-z0-9_.-]/g, "") || "user" + Date.now().toString().slice(-4);
 
-          if (result.status === "complete") {
-            await clerk.setActive({ session: result.createdSessionId });
-            await onSubmit({ email: emailVal, password: pwVal, name: nameVal });
-            return;
-          } else if (result.status === "missing_requirements") {
-            await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
-            setPendingVerification(true);
-            return;
+        // Register with Spring Boot backend (Neon Postgres)
+        try {
+          await authApi.register(derivedUsername, emailVal, pwVal);
+        } catch (apiErr: any) {
+          const errMsg = apiErr.response?.data?.error || apiErr.message || "Failed to create account";
+          setErrorMsg(errMsg);
+          setBusy(null);
+          return;
+        }
+
+        // Optional sync with Clerk if active
+        if (signUp?.create) {
+          try {
+            const [firstName, ...rest] = nameVal.trim().split(" ");
+            const lastName = rest.join(" ");
+            const result = await signUp.create({
+              emailAddress: emailVal,
+              password: pwVal,
+              firstName: firstName || undefined,
+              lastName: lastName || undefined,
+            });
+
+            if (result.status === "complete") {
+              await clerk.setActive({ session: result.createdSessionId });
+            }
+          } catch (clerkErr) {
+            console.debug("Clerk signup optional sync:", clerkErr);
           }
         }
-        await onSubmit({ email: emailVal, password: pwVal, name: nameVal });
+        await onSubmit?.({ email: emailVal, password: pwVal, name: nameVal });
       } catch (err: unknown) {
         const clerkErr = err as { errors?: Array<{ message: string }>; message?: string };
         setErrorMsg(clerkErr.errors?.[0]?.message || clerkErr.message || "Failed to create account");

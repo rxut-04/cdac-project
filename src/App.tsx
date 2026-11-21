@@ -3,13 +3,17 @@ import { AuthenticateWithRedirectCallback, useUser, useClerk } from "@clerk/reac
 import DemoOne from "@/components/ui/demo";
 import { SmokeLogin } from "@/components/ui/smoke-login";
 import { DashboardPage } from "@/components/ui/dashboard-page";
+import { authApi } from "@/lib/api";
 
 type Page = "home" | "login" | "signup" | "dashboard";
 
 export default function App() {
   const { isSignedIn, user, isLoaded } = useUser();
   const { signOut } = useClerk();
-  const [userEmail, setUserEmail] = useState("alex@mygit.dev");
+  const [userEmail, setUserEmail] = useState(() => {
+    const stored = authApi.getStoredUser();
+    return stored?.email || "alex.chen@mygit.dev";
+  });
 
   const [page, setPage] = useState<Page>(() => {
     if (typeof window !== "undefined") {
@@ -84,6 +88,7 @@ export default function App() {
       <DashboardPage
         userEmail={currentEmail}
         onSignOut={async () => {
+          authApi.logout();
           if (isSignedIn) {
             try {
               await signOut();

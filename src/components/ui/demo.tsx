@@ -6,6 +6,7 @@ import { LiquidButton } from "@/components/ui/liquid-glass-button";
 import { AntiMetalButton } from "@/components/ui/anti-metal-button";
 import CompareUILib, { type ComparisonData } from "@/components/ui/shadcn-studio-compare-07";
 import WordmarkFooter from "@/components/ui/wordmark-footer";
+import { InstallSection } from "@/components/ui/install-section";
 
 const mygitComparisonData: ComparisonData = {
   column1Header: {
@@ -152,6 +153,9 @@ export default function DemoOne({
 
         {/* Navigation Links */}
         <nav className="hidden md:flex items-center gap-7 text-xs font-medium text-neutral-600 dark:text-neutral-300">
+          <a href="#install" className="hover:text-neutral-950 dark:hover:text-[#b8ff3c] transition-colors font-bold text-[#7ecc24] dark:text-[#9dff3a]">
+            Install CLI
+          </a>
           <a href="#compare" className="hover:text-neutral-950 dark:hover:text-[#b8ff3c] transition-colors">
             Compare
           </a>
@@ -193,6 +197,9 @@ export default function DemoOne({
           onSignIn={handleSignIn}
           onSignUp={handleSignUp}
         />
+
+        {/* Windows / macOS / Linux CLI Download & Auto-Environment Installer */}
+        <InstallSection />
 
         {/* Comparison Section (mygit vs Git & Cloud) */}
         <CompareUILib data={mygitComparisonData} />
