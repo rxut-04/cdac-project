@@ -1,9 +1,80 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import FigmaBrandHero from "@/components/ui/figma-brand-hero";
-import { FolderGit2, LogIn, UserPlus, X, Sun, Moon, LayoutDashboard } from "lucide-react";
+import { FolderGit2, GitBranch, LogIn, UserPlus, X, Sun, Moon, LayoutDashboard } from "lucide-react";
 import { LiquidButton } from "@/components/ui/liquid-glass-button";
 import { AntiMetalButton } from "@/components/ui/anti-metal-button";
+import CompareUILib, { type ComparisonData } from "@/components/ui/shadcn-studio-compare-07";
+
+const mygitComparisonData: ComparisonData = {
+  column1Header: {
+    icon: (
+      <div className="w-7 h-7 rounded-lg bg-[#c8ff29] dark:bg-[#b8ff3c] flex items-center justify-center shadow-xs">
+        <FolderGit2 className="w-4 h-4 text-neutral-950" />
+      </div>
+    ),
+    title: "mygit",
+  },
+  column2Header: {
+    icon: (
+      <div className="w-7 h-7 rounded-lg bg-neutral-200 dark:bg-neutral-800 flex items-center justify-center border border-neutral-300 dark:border-neutral-700">
+        <GitBranch className="w-4 h-4 text-neutral-800 dark:text-neutral-200" />
+      </div>
+    ),
+    title: "Git + GitHub / Cloud",
+  },
+  column3Header: "The Advantage for You",
+  features: [
+    {
+      name: "Byte-Level Compatibility",
+      column1: "100% byte-compatible SHA-1 loose objects (blob, tree, commit). Validated by git cat-file & git fsck.",
+      column2: "Standard Git object store format.",
+      column3: "Zero vendor lock-in. Real Git tools can inspect and read your mygit repos directly.",
+    },
+    {
+      name: "Self-Hosted Platform",
+      column1: "Integrated lightweight FastAPI + SQLite bare repository server and web UI.",
+      column2: "Heavyweight setup (GitHub Enterprise, GitLab, or Gitea with complex dependencies).",
+      column3: "Spin up a full personal GitHub on any machine with a single python command in seconds.",
+    },
+    {
+      name: "Interactive REPL Shell",
+      column1: "Built-in MyGitShell with colored branch prompt, autocompletion, and direct CLI execution.",
+      column2: "Requires external shell scripts (starship, oh-my-zsh) and repetitive process spawns.",
+      column3: "Persistent context-aware session that boosts developer speed and command visibility.",
+    },
+    {
+      name: "Merge Engine & LCA",
+      column1: "Automated 3-way BFS merge base (Lowest Common Ancestor) with conflict marker generation.",
+      column2: "Complex recursive/ort merge heuristics.",
+      column3: "Deterministic, auditable merges with zero hidden automagic behavior.",
+    },
+    {
+      name: "Staging Index Format",
+      column1: "Human-readable text-based index v1 with explicit octal mode tracking (100644, 100755, 120000).",
+      column2: "Binary DIRCACHE format requiring specialized binary parsers.",
+      column3: "Trivial to inspect, debug, and script without reverse-engineering binary structs.",
+    },
+    {
+      name: "Implementation Footprint",
+      column1: "Pure Python 3.11+ stdlib core engine. Clean, modular, and dependency-free.",
+      column2: "Large legacy C codebase compiled with platform-specific native binaries.",
+      column3: "Easy to learn, extend, audit, and integrate into modern Python / DevOps pipelines.",
+    },
+    {
+      name: "Data Sovereignty & Privacy",
+      column1: "100% local-first and self-hosted. Zero telemetry, tracking, or cloud surveillance.",
+      column2: "Subject to commercial terms, rate limits, paywalled features, and cloud outages.",
+      column3: "Absolute code ownership and full air-gap offline readiness for sensitive codebases.",
+    },
+    {
+      name: "Sync Protocol",
+      column1: "Direct HTTP JSON ref query + zlib object stream with bearer token security.",
+      column2: "Smart Git transfer protocol (packfiles, sideband channels).",
+      column3: "Simple, robust synchronization that works behind proxies without SSH key struggles.",
+    },
+  ],
+};
 
 export default function DemoOne({
   onSignIn,
@@ -80,6 +151,9 @@ export default function DemoOne({
 
         {/* Navigation Links */}
         <nav className="hidden md:flex items-center gap-7 text-xs font-medium text-neutral-600 dark:text-neutral-300">
+          <a href="#compare" className="hover:text-neutral-950 dark:hover:text-[#b8ff3c] transition-colors">
+            Compare
+          </a>
           <a href="#repos" className="hover:text-neutral-950 dark:hover:text-[#b8ff3c] transition-colors">
             Repositories
           </a>
@@ -143,12 +217,15 @@ export default function DemoOne({
         </div>
       </header>
 
-      {/* Main Hero Container */}
-      <main className="flex-1 flex items-center justify-center p-4 sm:p-8">
+      {/* Main Content: Hero + Comparison Section */}
+      <main className="flex-1 flex flex-col items-center justify-center p-4 sm:p-8 space-y-16">
         <FigmaBrandHero
           onSignIn={handleSignIn}
           onSignUp={handleSignUp}
         />
+
+        {/* Comparison Section (mygit vs Git & Cloud) */}
+        <CompareUILib data={mygitComparisonData} />
       </main>
 
       {/* Interactive Modal for Login & Sign Up */}
