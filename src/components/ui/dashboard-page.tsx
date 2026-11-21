@@ -1273,7 +1273,7 @@ export function DashboardPage({
                   </div>
                   <div className="space-y-1 pt-2.5 border-t border-neutral-800">
                     <p className="text-neutral-500 font-sans font-medium text-[11px]"># Option 2: Link an existing repository</p>
-                    <p className="text-cyan-400">mygit remote add origin http://localhost:8080/api/repos/{createdRepoSetup}</p>
+                    <p className="text-cyan-400">mygit remote add origin https://mygit-backend-y27o.onrender.com/api/repos/{createdRepoSetup}</p>
                     <p className="text-cyan-400">mygit push origin main</p>
                   </div>
                 </div>

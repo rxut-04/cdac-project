@@ -34,6 +34,13 @@
   to = "/install.sh"
   status = 200
 
+# Proxy /api calls to live Render Spring Boot backend
+[[redirects]]
+  from = "/api/*"
+  to = "https://mygit-backend-y27o.onrender.com/api/:splat"
+  status = 200
+  force = true
+
 # SPA catch-all fallback
 [[redirects]]
   from = "/*"
