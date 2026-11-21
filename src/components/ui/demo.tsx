@@ -138,7 +138,7 @@ export default function DemoOne({
   };
 
   return (
-    <div className="relative min-h-screen w-full flex flex-col justify-between bg-[#f8f9f5] dark:bg-[#07090e] bg-[linear-gradient(to_right,#e5e7eb_1px,transparent_1px),linear-gradient(to_bottom,#e5e7eb_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,#1b202c_1px,transparent_1px),linear-gradient(to_bottom,#1b202c_1px,transparent_1px)] bg-[size:24px_24px] text-neutral-900 dark:text-neutral-100 transition-colors duration-300 overflow-x-hidden">
+    <div className="relative min-h-screen w-full flex flex-col bg-[#f8f9f5] dark:bg-[#07090e] bg-[linear-gradient(to_right,#e5e7eb_1px,transparent_1px),linear-gradient(to_bottom,#e5e7eb_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,#1b202c_1px,transparent_1px),linear-gradient(to_bottom,#1b202c_1px,transparent_1px)] bg-[size:24px_24px] text-neutral-900 dark:text-neutral-100 transition-colors duration-300 overflow-x-hidden">
       
       {/* Minimalist Top Navbar */}
       <header className="sticky top-0 z-40 w-full px-6 sm:px-12 py-3.5 bg-white/70 dark:bg-neutral-950/70 backdrop-blur-md border-b border-neutral-200/80 dark:border-neutral-800/80 flex items-center justify-between">
@@ -188,7 +188,7 @@ export default function DemoOne({
       </header>
 
       {/* Main Content: Hero + Comparison Section */}
-      <main className="flex-1 flex flex-col items-center justify-center p-4 sm:p-8 space-y-16">
+      <main className="flex-1 flex flex-col items-center w-full px-4 sm:px-8 py-6 sm:py-12 space-y-16 sm:space-y-24">
         <FigmaBrandHero
           onSignIn={handleSignIn}
           onSignUp={handleSignUp}

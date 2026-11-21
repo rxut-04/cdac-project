@@ -1,5 +1,6 @@
 import type { ComponentProps, ReactNode } from "react";
 import React from "react";
+import { ArrowLeftRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /* -------------------------------------------------------------------------- */
@@ -49,7 +50,7 @@ function Card({ className, ...props }: ComponentProps<"div">) {
     <div
       data-slot="card"
       className={cn(
-        "group/card bg-white/70 dark:bg-neutral-900/70 backdrop-blur-md text-foreground flex flex-col overflow-hidden rounded-2xl border border-neutral-200 dark:border-neutral-800 text-sm shadow-xl",
+        "group/card bg-white/70 dark:bg-neutral-900/70 backdrop-blur-md text-foreground flex flex-col overflow-hidden overflow-x-auto touch-pan-x [-webkit-overflow-scrolling:touch] rounded-2xl border border-neutral-200 dark:border-neutral-800 text-sm shadow-xl",
         className
       )}
       {...props}
@@ -137,12 +138,18 @@ export const CompareUILib = ({
             <span className="w-2 h-2 rounded-full bg-[#b8ff3c] animate-pulse" />
             VCS Architecture Comparison
           </div>
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-neutral-950 dark:text-white">
+          <h2 className="text-2xl sm:text-4xl md:text-5xl font-black tracking-tight text-neutral-950 dark:text-white px-2">
             {title}
           </h2>
-          <p className="text-neutral-600 dark:text-neutral-400 text-sm sm:text-base md:text-lg leading-relaxed">
+          <p className="text-neutral-600 dark:text-neutral-400 text-xs sm:text-base md:text-lg leading-relaxed px-2">
             {description}
           </p>
+        </div>
+
+        {/* Mobile Swipe Hint */}
+        <div className="flex items-center justify-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400 sm:hidden">
+          <ArrowLeftRight className="w-3.5 h-3.5 text-[#b8ff3c]" />
+          <span>Swipe horizontally to compare all details</span>
         </div>
 
         {/* Comparison Table Card */}
@@ -150,7 +157,7 @@ export const CompareUILib = ({
           role="region"
           aria-label={title}
           tabIndex={0}
-          className="focus-visible:ring-ring/50 overflow-hidden overflow-x-auto outline-none focus-visible:ring-2"
+          className="focus-visible:ring-ring/50 outline-none focus-visible:ring-2"
         >
           <table className="w-full border-collapse text-left">
             <caption className="sr-only">{title}</caption>

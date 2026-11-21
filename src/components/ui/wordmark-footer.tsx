@@ -171,7 +171,7 @@ export function WordmarkFooter({
       {/* Giant Wordmark Fading into the Background */}
       <p
         aria-hidden="true"
-        className="pointer-events-none -mb-[0.2em] text-center text-[clamp(96px,24vw,340px)] font-black leading-[0.85] tracking-tighter text-transparent select-none bg-linear-to-b from-neutral-950/[0.14] to-transparent dark:from-white/[0.09] dark:to-transparent bg-clip-text max-md:text-[28vw]"
+        className="pointer-events-none -mb-[0.2em] text-center text-[clamp(64px,24vw,340px)] font-black leading-[0.85] tracking-tighter text-transparent select-none bg-linear-to-b from-neutral-950/[0.14] to-transparent dark:from-white/[0.09] dark:to-transparent bg-clip-text max-md:text-[24vw] overflow-hidden"
       >
         {name}
       </p>
