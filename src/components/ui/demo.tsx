@@ -5,6 +5,7 @@ import { FolderGit2, GitBranch, LogIn, UserPlus, X, Sun, Moon } from "lucide-rea
 import { LiquidButton } from "@/components/ui/liquid-glass-button";
 import { AntiMetalButton } from "@/components/ui/anti-metal-button";
 import CompareUILib, { type ComparisonData } from "@/components/ui/shadcn-studio-compare-07";
+import WordmarkFooter from "@/components/ui/wordmark-footer";
 
 const mygitComparisonData: ComparisonData = {
   column1Header: {
@@ -196,6 +197,49 @@ export default function DemoOne({
         {/* Comparison Section (mygit vs Git & Cloud) */}
         <CompareUILib data={mygitComparisonData} />
       </main>
+
+      {/* Modern Wordmark Footer */}
+      <WordmarkFooter
+        name="mygit"
+        legalName="mygit Open Source VCS Engine"
+        year={2026}
+        description="A Git-compatible version control engine & self-hosted code collaboration platform built with byte-level precision in Python."
+        status="All nodes & object store operational"
+        email="hello@mygit.dev"
+        columns={[
+          {
+            title: "Product",
+            links: [
+              { label: "CLI Engine", href: "#engine" },
+              { label: "Architecture Compare", href: "#compare" },
+              { label: "Object Database", href: "#objects" },
+              { label: "Documentation", href: "#docs" },
+            ],
+          },
+          {
+            title: "Platform",
+            links: [
+              { label: "Repositories", href: "#repos" },
+              { label: "Pull Requests", href: "#pulls" },
+              { label: "Developer Dashboard", href: "#dashboard" },
+              { label: "REST Sync Protocol", href: "#api" },
+            ],
+          },
+          {
+            title: "Ecosystem",
+            links: [
+              { label: "GitHub Repository", href: "https://github.com/rxut-04/cdac-project.git" },
+              { label: "VCS Specification", href: "#spec" },
+              { label: "Security Policy", href: "#security" },
+              { label: "License & Terms", href: "#license" },
+            ],
+          },
+        ]}
+        credit={{
+          label: "Built for byte-compatible Git",
+          href: "https://github.com/rxut-04/cdac-project",
+        }}
+      />
 
       {/* Interactive Modal for Login & Sign Up */}
       {authModal && (
