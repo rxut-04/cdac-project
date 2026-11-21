@@ -21,9 +21,9 @@ export default function FigmaBrandHero({ onSignIn, onSignUp }: FigmaBrandHeroPro
   };
 
   return (
-    <div className="relative w-full max-w-4xl mx-auto flex flex-col items-center justify-center py-6 px-6 sm:px-12 -translate-y-4">
+    <div className="relative w-full max-w-4xl mx-auto flex flex-col items-center justify-center min-h-[calc(100vh-140px)] py-8 px-6 sm:px-12">
       {/* Main Bold Stack */}
-      <div className="flex flex-col items-center font-black tracking-tighter text-4xl sm:text-6xl md:text-7xl text-neutral-950 dark:text-white leading-[0.9] text-center select-none z-10">
+      <div className="flex flex-col items-center font-black tracking-tighter text-4xl sm:text-6xl md:text-7xl text-neutral-950 dark:text-white leading-[0.9] text-center select-none z-10 mt-10 sm:mt-16 md:mt-20">
         <motion.span
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
