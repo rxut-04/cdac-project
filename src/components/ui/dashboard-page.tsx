@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useState, useMemo, useEffect } from "react";
-import { repoApi } from "@/lib/api";
+import { repoApi, authApi } from "@/lib/api";
 import {
   Sidebar001,
   Sidebar001Content,
