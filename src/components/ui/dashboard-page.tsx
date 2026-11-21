@@ -71,7 +71,8 @@ export function DashboardPage({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const username = userEmail.split("@")[0] || "alex";
+  const storedUser = authApi.getStoredUser();
+  const username = storedUser?.username || userEmail.split("@")[0] || "user";
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -152,7 +153,7 @@ export function DashboardPage({
       .list()
       .then((backendRepos) => {
         if (!isMounted) return;
-        if (backendRepos && backendRepos.length > 0) {
+        if (Array.isArray(backendRepos)) {
           const mapped = backendRepos.map((r) => ({
             id: String(r.id),
             name: r.name,
@@ -504,6 +505,19 @@ export function DashboardPage({
     } catch (err: any) {
       const msg = err.response?.data?.error || err.message || "Failed to create repository";
       showToast(`Error: ${msg}`);
+    }
+  };
+
+  const handleDeleteRepo = async (repoName: string) => {
+    if (!window.confirm(`Are you sure you want to delete repository "${repoName}" from Neon DB?`)) {
+      return;
+    }
+    try {
+      await repoApi.delete(repoName);
+      setRepos((prev) => prev.filter((r) => r.name !== repoName));
+      showToast(`Repository ${repoName} deleted successfully.`);
+    } catch (err: any) {
+      showToast(`Error deleting repository: ${err.message || err}`);
     }
   };
 
@@ -1154,10 +1168,18 @@ export function DashboardPage({
                       <button
                         type="button"
                         onClick={() => copyToClipboard(`git clone mygit://mygit.dev/${username}/${repo.name}.git`)}
-                        className="px-2.5 py-1.5 rounded-md border border-border/50 bg-foreground/5 text-xs text-foreground/60 hover:text-foreground font-mono"
+                        className="px-2.5 py-1.5 rounded-md border border-border/50 bg-foreground/5 text-xs text-foreground/60 hover:text-foreground font-mono transition-colors"
                         title="Copy clone URL"
                       >
                         <Copy className="size-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteRepo(repo.name)}
+                        className="px-2.5 py-1.5 rounded-md border border-red-500/30 bg-red-500/5 text-xs text-red-500/70 hover:text-red-500 hover:bg-red-500/15 font-mono transition-colors"
+                        title="Delete repository"
+                      >
+                        <Trash2 className="size-3.5" />
                       </button>
                     </div>
                   </div>
@@ -1237,14 +1259,23 @@ export function DashboardPage({
                   </h2>
                 </div>
                 <p className="text-xs text-foreground/60">
-                  Quick setup — if you've done this kind of thing before, push an existing repository from your command line:
+                  Quick setup — initialize on any device using the <code className="text-emerald-400 font-mono">mygit</code> terminal or push an existing project:
                 </p>
 
-                <div className="p-3 rounded-lg bg-black/80 border border-border/50 space-y-2 font-mono text-xs text-emerald-400 overflow-x-auto">
-                  <p className="text-foreground/40"># Push an existing repository from the command line</p>
-                  <p>git remote add origin mygit://mygit.dev/{username}/{createdRepoSetup}.git</p>
-                  <p>git branch -M main</p>
-                  <p>git push -u origin main</p>
+                <div className="p-4 rounded-xl bg-black/90 border border-border/50 space-y-3 font-mono text-xs overflow-x-auto text-neutral-200">
+                  <div className="space-y-1">
+                    <p className="text-neutral-500 font-sans font-medium text-[11px]"># Option 1: Initialize on your terminal on any device</p>
+                    <p className="text-emerald-400">mygit init {createdRepoSetup}</p>
+                    <p className="text-neutral-300">cd {createdRepoSetup}</p>
+                    <p className="text-neutral-300">echo &quot;# {createdRepoSetup}&quot; &gt; README.md</p>
+                    <p className="text-neutral-300">mygit add .</p>
+                    <p className="text-neutral-300">mygit commit -m &quot;Initial commit&quot;</p>
+                  </div>
+                  <div className="space-y-1 pt-2.5 border-t border-neutral-800">
+                    <p className="text-neutral-500 font-sans font-medium text-[11px]"># Option 2: Link an existing repository</p>
+                    <p className="text-cyan-400">mygit remote add origin http://localhost:8080/api/repos/{createdRepoSetup}</p>
+                    <p className="text-cyan-400">mygit push origin main</p>
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-3 pt-2">
