@@ -58,44 +58,79 @@ $CmdContent = @"
 @echo off
 setlocal
 set "MYGIT_DIR=%~dp0"
-if exist "%MYGIT_DIR%\mygit.exe" (
-    "%MYGIT_DIR%\mygit.exe" %*
-) else (
-    where python >nul 2>nul
-    if %ERRORLEVEL% equ 0 (
-        python "%MYGIT_DIR%\mygit_cli" %*
-    ) else (
-        where py >nul 2>nul
-        if %ERRORLEVEL% equ 0 (
-            py "%MYGIT_DIR%\mygit_cli" %*
-        ) else (
-            where python3 >nul 2>nul
-            if %ERRORLEVEL% equ 0 (
-                python3 "%MYGIT_DIR%\mygit_cli" %*
-            ) else (
-                echo [mygit] Python is required to run mygit CLI. Please install Python from https://python.org
-                exit /b 1
-            )
-        )
-    )
+set "SCRIPT_PATH=%MYGIT_DIR%\mygit_cli.py"
+if not exist "%SCRIPT_PATH%" set "SCRIPT_PATH=%MYGIT_DIR%\mygit_cli"
+
+rem Test py launcher first (bypasses WindowsApps broken stubs)
+py -3 --version >nul 2>nul
+if %ERRORLEVEL% equ 0 (
+    py -3 "%SCRIPT_PATH%" %*
+    exit /b %ERRORLEVEL%
 )
+
+py --version >nul 2>nul
+if %ERRORLEVEL% equ 0 (
+    py "%SCRIPT_PATH%" %*
+    exit /b %ERRORLEVEL%
+)
+
+rem Test python
+python --version >nul 2>nul
+if %ERRORLEVEL% equ 0 (
+    python "%SCRIPT_PATH%" %*
+    exit /b %ERRORLEVEL%
+)
+
+rem Test python3
+python3 --version >nul 2>nul
+if %ERRORLEVEL% equ 0 (
+    python3 "%SCRIPT_PATH%" %*
+    exit /b %ERRORLEVEL%
+)
+
+echo [mygit error] Python 3 was not detected on Windows or the WindowsApp alias is active.
+echo Please install Python from https://www.python.org/downloads/ (check 'Add python.exe to PATH').
+echo Or run mygit inside WSL / Git Bash by typing: wsl mygit
+exit /b 1
 "@
 Set-Content -Path $CmdLauncher -Value $CmdContent -Force
 
 $Ps1Launcher = Join-Path $InstallDir "mygit.ps1"
 $Ps1Content = @"
 `$MyGitDir = Split-Path -Parent `$MyInvocation.MyCommand.Path
-`$ExePath = Join-Path `$MyGitDir "mygit.exe"
-if (Test-Path `$ExePath) {
-    & `$ExePath @args
-} elseif (Get-Command python -ErrorAction SilentlyContinue) {
-    python (Join-Path `$MyGitDir "mygit_cli") @args
-} elseif (Get-Command py -ErrorAction SilentlyContinue) {
-    py (Join-Path `$MyGitDir "mygit_cli") @args
-} elseif (Get-Command python3 -ErrorAction SilentlyContinue) {
-    python3 (Join-Path `$MyGitDir "mygit_cli") @args
+`$ScriptPath = Join-Path `$MyGitDir "mygit_cli.py"
+if (!(Test-Path `$ScriptPath)) {
+    `$ScriptPath = Join-Path `$MyGitDir "mygit_cli"
+}
+
+`$PythonCmd = `$null
+foreach (`$cmd in @("py -3", "py", "python", "python3")) {
+    try {
+        `$parts = `$cmd -split ' '
+        `$exe = `$parts[0]
+        `$arg = if (`$parts.Length -gt 1) { `$parts[1] } else { "--version" }
+        `$out = & `$exe `$arg 2>&1
+        if (`$LASTEXITCODE -eq 0 -or `$out -match "Python \d") {
+            `$PythonCmd = `$cmd
+            break
+        }
+    } catch {}
+}
+
+if (`$PythonCmd) {
+    if (`$PythonCmd -eq "py -3") {
+        & py -3 `$ScriptPath @args
+    } elseif (`$PythonCmd -eq "py") {
+        & py `$ScriptPath @args
+    } elseif (`$PythonCmd -eq "python") {
+        & python `$ScriptPath @args
+    } else {
+        & python3 `$ScriptPath @args
+    }
 } else {
-    Write-Error "[mygit] Python is required to run mygit CLI. Please install Python from https://python.org"
+    Write-Host "[mygit error] Python 3 was not detected on Windows." -ForegroundColor Red
+    Write-Host "Please install Python from https://www.python.org/downloads/ (check 'Add python.exe to PATH')." -ForegroundColor Yellow
+    Write-Host "Or run inside WSL: wsl mygit" -ForegroundColor Cyan
 }
 "@
 Set-Content -Path $Ps1Launcher -Value $Ps1Content -Force
