@@ -65,8 +65,18 @@ if exist "%MYGIT_DIR%\mygit.exe" (
     if %ERRORLEVEL% equ 0 (
         python "%MYGIT_DIR%\mygit_cli" %*
     ) else (
-        echo [mygit] Python or mygit.exe not detected in %MYGIT_DIR%
-        exit /b 1
+        where py >nul 2>nul
+        if %ERRORLEVEL% equ 0 (
+            py "%MYGIT_DIR%\mygit_cli" %*
+        ) else (
+            where python3 >nul 2>nul
+            if %ERRORLEVEL% equ 0 (
+                python3 "%MYGIT_DIR%\mygit_cli" %*
+            ) else (
+                echo [mygit] Python is required to run mygit CLI. Please install Python from https://python.org
+                exit /b 1
+            )
+        )
     )
 )
 "@
@@ -78,8 +88,14 @@ $Ps1Content = @"
 `$ExePath = Join-Path `$MyGitDir "mygit.exe"
 if (Test-Path `$ExePath) {
     & `$ExePath @args
-} else {
+} elseif (Get-Command python -ErrorAction SilentlyContinue) {
     python (Join-Path `$MyGitDir "mygit_cli") @args
+} elseif (Get-Command py -ErrorAction SilentlyContinue) {
+    py (Join-Path `$MyGitDir "mygit_cli") @args
+} elseif (Get-Command python3 -ErrorAction SilentlyContinue) {
+    python3 (Join-Path `$MyGitDir "mygit_cli") @args
+} else {
+    Write-Error "[mygit] Python is required to run mygit CLI. Please install Python from https://python.org"
 }
 "@
 Set-Content -Path $Ps1Launcher -Value $Ps1Content -Force
