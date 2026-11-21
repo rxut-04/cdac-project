@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useState, useMemo, useEffect } from "react";
 import { repoApi, authApi } from "@/lib/api";
+import { RepoFileExplorer } from "@/components/ui/repo-file-explorer";
 import {
   Sidebar001,
   Sidebar001Content,
@@ -36,6 +37,7 @@ import {
   Sparkles,
   RefreshCw,
   FolderPlus,
+  FolderGit2,
   Filter,
   Tag,
   MessageSquare,
@@ -91,6 +93,8 @@ export function DashboardPage({
   // -------------------------------------------------------------
 
   // Repositories State
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [selectedRepoForTree, setSelectedRepoForTree] = useState<any | null>(null);
   const [repos, setRepos] = useState([
     {
       id: "1",
@@ -635,6 +639,18 @@ export function DashboardPage({
   // RENDER MAIN CONTENT VIEW SWITCHER
   // -------------------------------------------------------------
   const renderContent = () => {
+    if (selectedRepoForTree) {
+      return (
+        <RepoFileExplorer
+          repoName={selectedRepoForTree.name}
+          ownerUsername={selectedRepoForTree.ownerUsername || username}
+          isPrivate={selectedRepoForTree.isPrivate}
+          description={selectedRepoForTree.description}
+          onBack={() => setSelectedRepoForTree(null)}
+        />
+      );
+    }
+
     switch (active) {
       // ---------------------------------------------------------
       // 1. ACTIVITY VIEW
@@ -1026,6 +1042,18 @@ export function DashboardPage({
       // 4. YOUR REPOSITORIES VIEW
       // ---------------------------------------------------------
       case "/repositories": {
+        if (selectedRepoForTree) {
+          return (
+            <RepoFileExplorer
+              repoName={selectedRepoForTree.name}
+              ownerUsername={selectedRepoForTree.ownerUsername || username}
+              isPrivate={selectedRepoForTree.isPrivate}
+              description={selectedRepoForTree.description}
+              onBack={() => setSelectedRepoForTree(null)}
+            />
+          );
+        }
+
         return (
           <div className="space-y-6 max-w-5xl">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/50 pb-5">
@@ -1119,7 +1147,10 @@ export function DashboardPage({
                   >
                     <div className="space-y-1.5 flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="font-semibold text-sm text-foreground hover:underline cursor-pointer">
+                        <span
+                          onClick={() => setSelectedRepoForTree(repo)}
+                          className="font-semibold text-sm text-foreground hover:underline cursor-pointer"
+                        >
                           {repo.name}
                         </span>
                         <span className="inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded border border-border/50 text-foreground/50">
@@ -1153,6 +1184,15 @@ export function DashboardPage({
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedRepoForTree(repo)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border/50 bg-foreground/5 text-xs font-mono text-foreground/80 hover:text-foreground hover:bg-foreground/10 transition-colors"
+                        title="Browse repository files"
+                      >
+                        <FolderGit2 className="size-3.5 text-emerald-400" />
+                        <span>Files</span>
+                      </button>
                       <button
                         type="button"
                         onClick={() => toggleStar(repo.id)}
@@ -2487,6 +2527,10 @@ export function DashboardPage({
                   {repos.slice(0, 4).map((repo) => (
                     <div
                       key={repo.id}
+                      onClick={() => {
+                        setSelectedRepoForTree(repo);
+                        setActive("/repositories");
+                      }}
                       className="p-4 rounded-lg border border-border/50 bg-foreground/5 hover:border-border transition-colors flex flex-col justify-between group cursor-pointer"
                     >
                       <div>
