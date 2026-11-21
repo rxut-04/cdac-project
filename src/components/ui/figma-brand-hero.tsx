@@ -12,17 +12,7 @@ export interface FigmaBrandHeroProps {
 
 export default function FigmaBrandHero({ onSignIn, onSignUp }: FigmaBrandHeroProps) {
   const [copied, setCopied] = useState(false);
-
-  const getCommand = () => {
-    if (typeof window !== "undefined") {
-      if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
-        return `irm ${window.location.origin}/install.ps1 | iex`;
-      }
-    }
-    return "irm https://velvety-druid-dccd85.netlify.app/install.ps1 | iex";
-  };
-
-  const commandText = getCommand();
+  const commandText = "irm https://velvety-druid-dccd85.netlify.app/install.ps1 | iex";
 
   const copyCommand = (e: React.MouseEvent) => {
     e.stopPropagation();

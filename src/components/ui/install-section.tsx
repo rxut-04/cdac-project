@@ -16,16 +16,8 @@ export function InstallSection() {
   const [os, setOs] = useState<"windows" | "unix">("windows");
   const [copied, setCopied] = useState(false);
 
-  const getOrigin = () => {
-    if (typeof window !== "undefined") {
-      return window.location.origin;
-    }
-    return "https://velvety-druid-dccd85.netlify.app";
-  };
-
-  const origin = getOrigin();
-  const windowsCmd = `irm ${origin}/install.ps1 | iex`;
-  const unixCmd = `curl -fsSL ${origin}/install.sh | bash`;
+  const windowsCmd = "irm https://velvety-druid-dccd85.netlify.app/install.ps1 | iex";
+  const unixCmd = "curl -fsSL https://velvety-druid-dccd85.netlify.app/install.sh | bash";
 
   const currentCmd = os === "windows" ? windowsCmd : unixCmd;
 
