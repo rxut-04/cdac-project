@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { AuthenticateWithRedirectCallback, useUser, useClerk } from "@clerk/react";
 import DemoOne from "@/components/ui/demo";
 import { SmokeLogin } from "@/components/ui/smoke-login";
 import { DashboardPage } from "@/components/ui/dashboard-page";
@@ -6,7 +7,10 @@ import { DashboardPage } from "@/components/ui/dashboard-page";
 type Page = "home" | "login" | "signup" | "dashboard";
 
 export default function App() {
+  const { isSignedIn, user, isLoaded } = useUser();
+  const { signOut } = useClerk();
   const [userEmail, setUserEmail] = useState("alex@mygit.dev");
+
   const [page, setPage] = useState<Page>(() => {
     if (typeof window !== "undefined") {
       const hash = window.location.hash.replace("#", "").toLowerCase();
@@ -16,6 +20,13 @@ export default function App() {
     }
     return "home";
   });
+
+  // Check for SSO Callback from OAuth providers
+  const isSSOCallback =
+    typeof window !== "undefined" &&
+    (window.location.pathname === "/sso-callback" ||
+      window.location.hash.includes("sso-callback") ||
+      window.location.search.includes("__clerk"));
 
   useEffect(() => {
     const handleHashChange = () => {
@@ -30,6 +41,16 @@ export default function App() {
     return () => window.removeEventListener("hashchange", handleHashChange);
   }, []);
 
+  // Sync user email when Clerk signs in
+  useEffect(() => {
+    if (isLoaded && isSignedIn && user) {
+      const primaryEmail = user.primaryEmailAddress?.emailAddress;
+      if (primaryEmail) {
+        setUserEmail(primaryEmail);
+      }
+    }
+  }, [isLoaded, isSignedIn, user]);
+
   const navigate = (nextPage: Page) => {
     setPage(nextPage);
     if (nextPage === "home") {
@@ -39,11 +60,37 @@ export default function App() {
     }
   };
 
+  // Render SSO redirect callback handler if active
+  if (isSSOCallback) {
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center bg-[#0c0d0c] text-white">
+        <div className="flex flex-col items-center gap-4 text-center p-6">
+          <div className="size-8 rounded-full border-2 border-[#9dff3a] border-t-transparent animate-spin" />
+          <p className="text-sm font-medium tracking-wide text-neutral-400">
+            Completing authentication with Clerk...
+          </p>
+          <AuthenticateWithRedirectCallback
+            signInForceRedirectUrl="/#dashboard"
+            signUpForceRedirectUrl="/#dashboard"
+          />
+        </div>
+      </div>
+    );
+  }
+
   if (page === "dashboard") {
+    const currentEmail = (isSignedIn && user?.primaryEmailAddress?.emailAddress) || userEmail;
     return (
       <DashboardPage
-        userEmail={userEmail}
-        onSignOut={() => {
+        userEmail={currentEmail}
+        onSignOut={async () => {
+          if (isSignedIn) {
+            try {
+              await signOut();
+            } catch (err) {
+              console.error("Sign out error:", err);
+            }
+          }
           navigate("home");
         }}
       />
@@ -60,15 +107,11 @@ export default function App() {
         onSwitchMode={(mode) => navigate(mode)}
         onBackHome={() => navigate("home")}
         onSubmit={async (values) => {
-          console.log("Logged in:", values);
           if (values.email) setUserEmail(values.email);
-          await new Promise((r) => setTimeout(r, 600));
           navigate("dashboard");
         }}
         onProviderSignIn={async (provider) => {
-          console.log("Sign in with:", provider);
           setUserEmail(`alex.${provider}@mygit.dev`);
-          await new Promise((r) => setTimeout(r, 600));
           navigate("dashboard");
         }}
         footer={
@@ -90,15 +133,11 @@ export default function App() {
         onSwitchMode={(mode) => navigate(mode)}
         onBackHome={() => navigate("home")}
         onSubmit={async (values) => {
-          console.log("Signed up:", values);
           if (values.email) setUserEmail(values.email);
-          await new Promise((r) => setTimeout(r, 600));
           navigate("dashboard");
         }}
         onProviderSignIn={async (provider) => {
-          console.log("Sign up with:", provider);
           setUserEmail(`alex.${provider}@mygit.dev`);
-          await new Promise((r) => setTimeout(r, 600));
           navigate("dashboard");
         }}
         footer={

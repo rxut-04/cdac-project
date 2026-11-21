@@ -24,7 +24,8 @@ import {
   type ReactNode,
 } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { ArrowLeft, ArrowRight, Eye, EyeOff, LoaderCircle, Moon, Sun } from "lucide-react";
+import { ArrowLeft, ArrowRight, Eye, EyeOff, LoaderCircle, Moon, Sun, AlertCircle } from "lucide-react";
+import { useSignIn, useSignUp } from "@clerk/react";
 import { cn } from "@/lib/utils";
 
 export type SmokeLoginProvider = "apple" | "google";
@@ -104,36 +105,141 @@ export function SmokeLogin({
   const [busy, setBusy] = useState(null as null | "form" | SmokeLoginProvider);
   const [emailVal, setEmailVal] = useState(mode === "login" ? "alex@mygit.dev" : "");
   const [pwVal, setPwVal] = useState(mode === "login" ? "gitpassword123" : "");
+  const [nameVal, setNameVal] = useState("");
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [pendingVerification, setPendingVerification] = useState(false);
+  const [verificationCode, setVerificationCode] = useState("");
+
+  const { signIn, isLoaded: signInLoaded, setActive: setActiveSignIn } = useSignIn();
+  const { signUp, isLoaded: signUpLoaded, setActive: setActiveSignUp } = useSignUp();
+
   const reduce = useReducedMotion();
   const dark = theme === "dark";
   const isSignUp = mode === "signup";
 
-  const resolvedTitle = title ?? (isSignUp ? "Create an account" : "Welcome back");
+  const resolvedTitle = title ?? (isSignUp ? (pendingVerification ? "Verify your email" : "Create an account") : "Welcome back");
   const resolvedSubtitle =
-    subtitle ?? (isSignUp ? "Join the developer network building with byte-compatible Git." : "Sign in to pick up where you left off.");
+    subtitle ?? (isSignUp ? (pendingVerification ? "Enter the 6-digit code sent to your inbox." : "Join the developer network building with byte-compatible Git.") : "Sign in to pick up where you left off.");
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (busy) return;
-    const data = new FormData(e.currentTarget);
-    setBusy("form");
-    try {
-      await onSubmit({
-        email: String(data.get("email") || emailVal),
-        password: String(data.get("password") || pwVal),
-        name: isSignUp ? String(data.get("name") || "") : undefined,
-      });
-    } finally {
-      setBusy(null);
+    setErrorMsg(null);
+
+    // 1. If currently in sign-up verification phase:
+    if (isSignUp && pendingVerification) {
+      if (!signUpLoaded || !signUp) return;
+      setBusy("form");
+      try {
+        const completeSignUp = await signUp.attemptEmailAddressVerification({
+          code: verificationCode.trim(),
+        });
+        if (completeSignUp.status === "complete") {
+          await setActiveSignUp({ session: completeSignUp.createdSessionId });
+          await onSubmit({ email: emailVal, password: pwVal, name: nameVal });
+        } else {
+          setErrorMsg("Verification incomplete. Please check your code and try again.");
+        }
+      } catch (err: unknown) {
+        const clerkErr = err as { errors?: Array<{ message: string }>; message?: string };
+        setErrorMsg(clerkErr.errors?.[0]?.message || clerkErr.message || "Invalid verification code");
+      } finally {
+        setBusy(null);
+      }
+      return;
+    }
+
+    // 2. Sign In flow with Clerk
+    if (!isSignUp) {
+      setBusy("form");
+      try {
+        if (signInLoaded && signIn) {
+          const result = await signIn.create({
+            identifier: emailVal,
+            password: pwVal,
+          });
+          if (result.status === "complete") {
+            await setActiveSignIn({ session: result.createdSessionId });
+            await onSubmit({ email: emailVal, password: pwVal });
+            return;
+          } else {
+            console.log("Additional sign-in requirement:", result.status);
+          }
+        }
+        await onSubmit({ email: emailVal, password: pwVal });
+      } catch (err: unknown) {
+        const clerkErr = err as { errors?: Array<{ message: string }>; message?: string };
+        setErrorMsg(clerkErr.errors?.[0]?.message || clerkErr.message || "Invalid email or password");
+      } finally {
+        setBusy(null);
+      }
+      return;
+    }
+
+    // 3. Sign Up flow with Clerk
+    if (isSignUp) {
+      setBusy("form");
+      try {
+        if (signUpLoaded && signUp) {
+          const [firstName, ...rest] = nameVal.trim().split(" ");
+          const lastName = rest.join(" ");
+          const result = await signUp.create({
+            emailAddress: emailVal,
+            password: pwVal,
+            firstName: firstName || undefined,
+            lastName: lastName || undefined,
+          });
+
+          if (result.status === "complete") {
+            await setActiveSignUp({ session: result.createdSessionId });
+            await onSubmit({ email: emailVal, password: pwVal, name: nameVal });
+            return;
+          } else if (result.status === "missing_requirements") {
+            await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
+            setPendingVerification(true);
+            return;
+          }
+        }
+        await onSubmit({ email: emailVal, password: pwVal, name: nameVal });
+      } catch (err: unknown) {
+        const clerkErr = err as { errors?: Array<{ message: string }>; message?: string };
+        setErrorMsg(clerkErr.errors?.[0]?.message || clerkErr.message || "Failed to create account");
+      } finally {
+        setBusy(null);
+      }
     }
   };
 
   const provider = async (p: SmokeLoginProvider) => {
     if (busy) return;
     setBusy(p);
+    setErrorMsg(null);
+    const strategy = p === "google" ? "oauth_google" : "oauth_apple";
+
     try {
+      if (isSignUp) {
+        if (signUpLoaded && signUp) {
+          await signUp.authenticateWithRedirect({
+            strategy,
+            redirectUrl: `${window.location.origin}/sso-callback`,
+            redirectUrlComplete: `${window.location.origin}/#dashboard`,
+          });
+          return;
+        }
+      } else {
+        if (signInLoaded && signIn) {
+          await signIn.authenticateWithRedirect({
+            strategy,
+            redirectUrl: `${window.location.origin}/sso-callback`,
+            redirectUrlComplete: `${window.location.origin}/#dashboard`,
+          });
+          return;
+        }
+      }
       await onProviderSignIn(p);
-    } finally {
+    } catch (err: unknown) {
+      const clerkErr = err as { errors?: Array<{ message: string }>; message?: string };
+      setErrorMsg(clerkErr.errors?.[0]?.message || clerkErr.message || `Failed to sign in with ${p}`);
       setBusy(null);
     }
   };
@@ -237,84 +343,153 @@ export function SmokeLogin({
           )}
 
           <form onSubmit={handleSubmit} className="mt-7 space-y-4">
-            {isSignUp && (
-              <motion.div {...rise(3.5)}>
-                <Label htmlFor="name">Full Name</Label>
-                <input
-                  id="name"
-                  name="name"
-                  type="text"
-                  required
-                  autoComplete="name"
-                  placeholder="Ada Lovelace"
-                  className={fieldCls}
-                />
+            {errorMsg && (
+              <motion.div
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-3 rounded-xl bg-red-500/10 border border-red-500/25 text-red-500 text-xs flex items-center gap-2"
+              >
+                <AlertCircle className="size-4 shrink-0" />
+                <span>{errorMsg}</span>
               </motion.div>
             )}
 
-            <motion.div {...rise(4)}>
-              <Label htmlFor="email">Email</Label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                required
-                autoComplete="email"
-                value={emailVal}
-                onChange={(e) => setEmailVal(e.target.value)}
-                placeholder="you@studio.com"
-                className={fieldCls}
-              />
-            </motion.div>
+            {isSignUp && pendingVerification ? (
+              <div className="space-y-4">
+                <div className="p-3 rounded-xl border border-[var(--line)] bg-[var(--field)] text-xs text-[var(--muted)]">
+                  Please enter the 6-digit verification code sent to{" "}
+                  <strong className="text-[var(--ink)] font-mono">{emailVal}</strong>.
+                </div>
 
-            <motion.div {...rise(5)}>
-              <div className="flex items-baseline justify-between">
-                <Label htmlFor="password">Password</Label>
-                {!isSignUp && (
-                  <a href={forgotPasswordHref} className="text-[12px] text-[var(--muted)] transition-colors hover:text-[var(--ink)]">
-                    Forgot?
-                  </a>
-                )}
-              </div>
-              <div className="relative">
-                <input
-                  id="password"
-                  name="password"
-                  type={showPw ? "text" : "password"}
-                  required
-                  autoComplete={isSignUp ? "new-password" : "current-password"}
-                  value={pwVal}
-                  onChange={(e) => setPwVal(e.target.value)}
-                  placeholder="••••••••"
-                  className={cn(fieldCls, "pr-12")}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPw((v) => !v)}
-                  aria-label={showPw ? "Hide password" : "Show password"}
-                  className="absolute right-1.5 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-[10px] text-[var(--muted)] transition-colors hover:text-[var(--ink)] focus-visible:outline-2 focus-visible:outline-[var(--accent)]"
-                >
-                  {showPw ? <EyeOff className="size-[18px]" /> : <Eye className="size-[18px]" />}
-                </button>
-              </div>
-            </motion.div>
+                <div>
+                  <Label htmlFor="verificationCode">Verification Code</Label>
+                  <input
+                    id="verificationCode"
+                    name="verificationCode"
+                    type="text"
+                    required
+                    autoFocus
+                    value={verificationCode}
+                    onChange={(e) => setVerificationCode(e.target.value)}
+                    placeholder="123456"
+                    className={cn(fieldCls, "font-mono tracking-widest text-center text-lg")}
+                  />
+                </div>
 
-            <motion.div {...rise(6)} className="pt-2">
-              <button
-                type="submit"
-                disabled={!!busy}
-                className="group relative flex h-12 w-full items-center justify-center gap-2 rounded-[14px] bg-[var(--btn)] text-[15px] font-medium text-[var(--btn-ink)] shadow-[0_1px_0_rgb(255_255_255/0.18)_inset,0_1px_2px_rgb(0_0_0/0.2),0_10px_24px_-12px_rgb(0_0_0/0.5)] transition-[transform,background-color,box-shadow] duration-300 [transition-timing-function:cubic-bezier(.22,1,.36,1)] hover:shadow-[0_1px_0_rgb(255_255_255/0.18)_inset,0_1px_2px_rgb(0_0_0/0.2),0_14px_30px_-12px_var(--accent)] active:scale-[0.985] disabled:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
-              >
-                {busy === "form" ? (
-                  <LoaderCircle className="size-[18px] animate-spin" />
-                ) : (
-                  <>
-                    {isSignUp ? "Create account" : "Sign in"}
-                    <ArrowRight className="size-4 transition-transform duration-300 group-hover:translate-x-0.5" />
-                  </>
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    disabled={!!busy}
+                    className="group relative flex h-12 w-full items-center justify-center gap-2 rounded-[14px] bg-[var(--btn)] text-[15px] font-medium text-[var(--btn-ink)] shadow-[0_1px_0_rgb(255_255_255/0.18)_inset,0_1px_2px_rgb(0_0_0/0.2),0_10px_24px_-12px_rgb(0_0_0/0.5)] transition-[transform,background-color,box-shadow] duration-300 active:scale-[0.985] disabled:opacity-80"
+                  >
+                    {busy === "form" ? (
+                      <LoaderCircle className="size-[18px] animate-spin" />
+                    ) : (
+                      <>
+                        Verify & Continue
+                        <ArrowRight className="size-4 transition-transform duration-300 group-hover:translate-x-0.5" />
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                <div className="text-center pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPendingVerification(false);
+                      setErrorMsg(null);
+                    }}
+                    className="text-xs text-[var(--muted)] hover:text-[var(--ink)] underline cursor-pointer"
+                  >
+                    Back to edit details
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                {isSignUp && (
+                  <motion.div {...rise(3.5)}>
+                    <Label htmlFor="name">Full Name</Label>
+                    <input
+                      id="name"
+                      name="name"
+                      type="text"
+                      required
+                      autoComplete="name"
+                      value={nameVal}
+                      onChange={(e) => setNameVal(e.target.value)}
+                      placeholder="Ada Lovelace"
+                      className={fieldCls}
+                    />
+                  </motion.div>
                 )}
-              </button>
-            </motion.div>
+
+                <motion.div {...rise(4)}>
+                  <Label htmlFor="email">Email</Label>
+                  <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    required
+                    autoComplete="email"
+                    value={emailVal}
+                    onChange={(e) => setEmailVal(e.target.value)}
+                    placeholder="you@studio.com"
+                    className={fieldCls}
+                  />
+                </motion.div>
+
+                <motion.div {...rise(5)}>
+                  <div className="flex items-baseline justify-between">
+                    <Label htmlFor="password">Password</Label>
+                    {!isSignUp && (
+                      <a href={forgotPasswordHref} className="text-[12px] text-[var(--muted)] transition-colors hover:text-[var(--ink)]">
+                        Forgot?
+                      </a>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <input
+                      id="password"
+                      name="password"
+                      type={showPw ? "text" : "password"}
+                      required
+                      autoComplete={isSignUp ? "new-password" : "current-password"}
+                      value={pwVal}
+                      onChange={(e) => setPwVal(e.target.value)}
+                      placeholder="••••••••"
+                      className={cn(fieldCls, "pr-12")}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPw((v) => !v)}
+                      aria-label={showPw ? "Hide password" : "Show password"}
+                      className="absolute right-1.5 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-[10px] text-[var(--muted)] transition-colors hover:text-[var(--ink)] focus-visible:outline-2 focus-visible:outline-[var(--accent)]"
+                    >
+                      {showPw ? <EyeOff className="size-[18px]" /> : <Eye className="size-[18px]" />}
+                    </button>
+                  </div>
+                </motion.div>
+
+                <motion.div {...rise(6)} className="pt-2">
+                  <button
+                    type="submit"
+                    disabled={!!busy}
+                    className="group relative flex h-12 w-full items-center justify-center gap-2 rounded-[14px] bg-[var(--btn)] text-[15px] font-medium text-[var(--btn-ink)] shadow-[0_1px_0_rgb(255_255_255/0.18)_inset,0_1px_2px_rgb(0_0_0/0.2),0_10px_24px_-12px_rgb(0_0_0/0.5)] transition-[transform,background-color,box-shadow] duration-300 [transition-timing-function:cubic-bezier(.22,1,.36,1)] hover:shadow-[0_1px_0_rgb(255_255_255/0.18)_inset,0_1px_2px_rgb(0_0_0/0.2),0_14px_30px_-12px_var(--accent)] active:scale-[0.985] disabled:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+                  >
+                    {busy === "form" ? (
+                      <LoaderCircle className="size-[18px] animate-spin" />
+                    ) : (
+                      <>
+                        {isSignUp ? "Create account" : "Sign in"}
+                        <ArrowRight className="size-4 transition-transform duration-300 group-hover:translate-x-0.5" />
+                      </>
+                    )}
+                  </button>
+                </motion.div>
+              </>
+            )}
           </form>
 
           <motion.div {...rise(7)} className="my-7 flex items-center gap-3 text-[12px] text-[var(--muted)]">
