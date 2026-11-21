@@ -7,9 +7,7 @@ import {
   Check,
   Download,
   ShieldCheck,
-  Sparkles,
   Command,
-  ArrowRight,
   Cpu,
   FolderGit2,
 } from "lucide-react";
@@ -40,52 +38,48 @@ export function InstallSection() {
   return (
     <section id="install" className="w-full max-w-5xl mx-auto px-4 sm:px-6 scroll-mt-24">
       {/* Section Header */}
-      <div className="text-center space-y-3 mb-10">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-neutral-200 dark:border-neutral-800 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-sm text-xs font-mono text-neutral-600 dark:text-neutral-300 shadow-xs">
-          <span className="size-2 rounded-full bg-[#9dff3a] animate-pulse" />
-          <span>Zero-Dependency Automated Installation</span>
+      <div className="text-center space-y-3 mb-8 sm:mb-10">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-neutral-200 dark:border-neutral-800 bg-white/70 dark:bg-neutral-900/70 backdrop-blur-md text-xs font-mono text-neutral-600 dark:text-neutral-400 shadow-xs">
+          <span className="size-1.5 rounded-full bg-[#c8ff29] dark:bg-[#b8ff3c]" />
+          <span>Standalone Distribution</span>
         </div>
-        <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-neutral-950 dark:text-white">
-          Download & Run Anywhere in Seconds
+        <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-neutral-950 dark:text-white">
+          Install the Engine Locally
         </h2>
-        <p className="text-sm sm:text-base text-neutral-600 dark:text-neutral-400 max-w-2xl mx-auto leading-relaxed">
-          One command downloads the <code className="text-[#84e022] dark:text-[#9dff3a] font-mono">mygit</code> engine,
-          automatically configures your Windows or Unix <code className="text-[#84e022] dark:text-[#9dff3a] font-mono">PATH</code> environment variables,
-          and connects to your isolated cloud workspace.
+        <p className="text-xs sm:text-sm text-neutral-600 dark:text-neutral-400 max-w-2xl mx-auto leading-relaxed">
+          Run one command to install <code className="font-mono text-neutral-900 dark:text-neutral-200 font-medium">mygit</code>,
+          register your system environment variables, and start initializing isolated repositories immediately.
         </p>
       </div>
 
       {/* Main Terminal Installer Card */}
-      <div className="relative rounded-3xl border border-neutral-200/90 dark:border-neutral-800/90 bg-white/90 dark:bg-[#0c0e12]/90 backdrop-blur-xl p-6 sm:p-8 shadow-2xl overflow-hidden">
-        {/* Glow ambient background */}
-        <div className="absolute -top-32 -right-32 size-64 rounded-full bg-[#9dff3a]/10 blur-3xl pointer-events-none" />
-
-        {/* OS Selector Tabs */}
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-neutral-200 dark:border-neutral-800/80 pb-5 mb-6">
-          <div className="flex items-center gap-2">
+      <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white/70 dark:bg-neutral-900/70 backdrop-blur-md p-6 sm:p-8 shadow-xl">
+        {/* Minimalist OS Selector Tabs */}
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-neutral-200/80 dark:border-neutral-800/80 pb-4 mb-6">
+          <div className="inline-flex items-center p-1 rounded-xl bg-neutral-100 dark:bg-neutral-800/60 border border-neutral-200/80 dark:border-neutral-700/60">
             <button
               type="button"
               onClick={() => setOs("windows")}
-              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2 transition-all cursor-pointer ${
                 os === "windows"
-                  ? "bg-[#9dff3a] text-neutral-950 shadow-md font-bold scale-[1.02]"
-                  : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800/50"
+                  ? "bg-white dark:bg-neutral-900 text-neutral-950 dark:text-white shadow-xs font-semibold"
+                  : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white"
               }`}
             >
-              <Terminal className="size-4" />
+              <Terminal className="size-3.5 text-neutral-500 dark:text-neutral-400" />
               <span>Windows (PowerShell)</span>
             </button>
 
             <button
               type="button"
               onClick={() => setOs("unix")}
-              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2 transition-all cursor-pointer ${
                 os === "unix"
-                  ? "bg-[#9dff3a] text-neutral-950 shadow-md font-bold scale-[1.02]"
-                  : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800/50"
+                  ? "bg-white dark:bg-neutral-900 text-neutral-950 dark:text-white shadow-xs font-semibold"
+                  : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white"
               }`}
             >
-              <Command className="size-4" />
+              <Command className="size-3.5 text-neutral-500 dark:text-neutral-400" />
               <span>macOS & Linux (curl)</span>
             </button>
           </div>
@@ -93,122 +87,117 @@ export function InstallSection() {
           <a
             href={os === "windows" ? "/install.ps1" : "/install.sh"}
             download={os === "windows" ? "install.ps1" : "install.sh"}
-            className="inline-flex items-center gap-1.5 text-xs font-mono text-[#7ecc24] dark:text-[#9dff3a] hover:underline cursor-pointer"
+            className="inline-flex items-center gap-1.5 text-xs font-mono text-neutral-600 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white transition-colors cursor-pointer"
           >
-            <Download className="size-3.5" />
-            <span>Download raw script</span>
+            <Download className="size-3.5 text-neutral-400" />
+            <span>Raw script</span>
           </a>
         </div>
 
         {/* Command Box */}
-        <div className="space-y-3">
-          <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
+        <div className="space-y-2.5">
+          <p className="text-xs text-neutral-500 dark:text-neutral-400">
             {os === "windows"
-              ? "Paste this one-liner into Windows PowerShell. It installs mygit and adds it to your User PATH automatically:"
-              : "Paste this one-liner into Terminal (bash/zsh). It installs to ~/.local/bin/mygit and updates your PATH:"}
+              ? "Run in Windows PowerShell. Automatically appends mygit to your User PATH:"
+              : "Run in your shell. Automatically installs to ~/.local/bin/mygit:"}
           </p>
 
-          <div className="group relative flex items-center justify-between rounded-2xl border border-neutral-300 dark:border-neutral-800 bg-neutral-950 p-4 font-mono text-xs sm:text-sm text-[#9dff3a] shadow-inner">
+          <div className="flex items-center justify-between rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-100/80 dark:bg-neutral-950/80 px-4 py-3 font-mono text-xs sm:text-sm text-neutral-900 dark:text-neutral-100">
             <span className="truncate pr-4 select-all">{currentCmd}</span>
 
             <button
               type="button"
               onClick={handleCopy}
-              className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-neutral-700 bg-neutral-900 text-neutral-200 hover:text-white hover:border-[#9dff3a]/50 transition-all cursor-pointer"
-              aria-label="Copy to clipboard"
+              className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-700 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-all cursor-pointer text-xs font-medium shadow-2xs"
+              aria-label="Copy command"
             >
               {copied ? (
                 <>
-                  <Check className="size-4 text-[#9dff3a]" />
-                  <span className="text-xs font-sans font-semibold text-[#9dff3a]">Copied!</span>
+                  <Check className="size-3.5 text-emerald-600 dark:text-[#b8ff3c]" />
+                  <span className="text-emerald-600 dark:text-[#b8ff3c] font-semibold">Copied</span>
                 </>
               ) : (
                 <>
-                  <Copy className="size-4 text-neutral-400 group-hover:text-white" />
-                  <span className="text-xs font-sans font-semibold">Copy</span>
+                  <Copy className="size-3.5 text-neutral-500 dark:text-neutral-400" />
+                  <span>Copy</span>
                 </>
               )}
             </button>
           </div>
         </div>
 
-        {/* Feature Badges Row */}
-        <div className="mt-6 pt-6 border-t border-neutral-200 dark:border-neutral-800/80 grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="flex items-start gap-3 p-3 rounded-2xl bg-neutral-50 dark:bg-neutral-900/40 border border-neutral-200/60 dark:border-neutral-800/50">
-            <div className="p-1.5 rounded-lg bg-[#9dff3a]/15 text-[#7ecc24] dark:text-[#9dff3a] shrink-0">
+        {/* Minimalist Feature Points */}
+        <div className="mt-6 pt-5 border-t border-neutral-200/80 dark:border-neutral-800/80 grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="flex items-start gap-3 p-3 rounded-xl bg-neutral-50/70 dark:bg-neutral-900/40 border border-neutral-200/60 dark:border-neutral-800/60">
+            <div className="p-1.5 rounded-lg bg-neutral-200/60 dark:bg-neutral-800/80 text-neutral-700 dark:text-neutral-300 shrink-0">
               <Cpu className="size-4" />
             </div>
             <div>
-              <h4 className="text-xs font-bold text-neutral-900 dark:text-white">Auto Windows PATH</h4>
+              <h4 className="text-xs font-semibold text-neutral-900 dark:text-neutral-200">Auto PATH Config</h4>
               <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5 leading-snug">
-                Writes to Windows User Registry. Run <code className="font-mono">mygit</code> immediately in any terminal.
+                Configures Windows User Environment variables automatically.
               </p>
             </div>
           </div>
 
-          <div className="flex items-start gap-3 p-3 rounded-2xl bg-neutral-50 dark:bg-neutral-900/40 border border-neutral-200/60 dark:border-neutral-800/50">
-            <div className="p-1.5 rounded-lg bg-[#9dff3a]/15 text-[#7ecc24] dark:text-[#9dff3a] shrink-0">
+          <div className="flex items-start gap-3 p-3 rounded-xl bg-neutral-50/70 dark:bg-neutral-900/40 border border-neutral-200/60 dark:border-neutral-800/60">
+            <div className="p-1.5 rounded-lg bg-neutral-200/60 dark:bg-neutral-800/80 text-neutral-700 dark:text-neutral-300 shrink-0">
               <ShieldCheck className="size-4" />
             </div>
             <div>
-              <h4 className="text-xs font-bold text-neutral-900 dark:text-white">Zero Admin Rights</h4>
+              <h4 className="text-xs font-semibold text-neutral-900 dark:text-neutral-200">Zero Admin Rights</h4>
               <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5 leading-snug">
-                Installs cleanly in per-user directory (<code className="font-mono">%LOCALAPPDATA%</code>). No UAC prompts.
+                Installs inside <code className="font-mono">%LOCALAPPDATA%</code> without UAC elevation.
               </p>
             </div>
           </div>
 
-          <div className="flex items-start gap-3 p-3 rounded-2xl bg-neutral-50 dark:bg-neutral-900/40 border border-neutral-200/60 dark:border-neutral-800/50">
-            <div className="p-1.5 rounded-lg bg-[#9dff3a]/15 text-[#7ecc24] dark:text-[#9dff3a] shrink-0">
+          <div className="flex items-start gap-3 p-3 rounded-xl bg-neutral-50/70 dark:bg-neutral-900/40 border border-neutral-200/60 dark:border-neutral-800/60">
+            <div className="p-1.5 rounded-lg bg-neutral-200/60 dark:bg-neutral-800/80 text-neutral-700 dark:text-neutral-300 shrink-0">
               <FolderGit2 className="size-4" />
             </div>
             <div>
-              <h4 className="text-xs font-bold text-neutral-900 dark:text-white">User Isolated Cloud</h4>
+              <h4 className="text-xs font-semibold text-neutral-900 dark:text-neutral-200">Local & Cloud Sync</h4>
               <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5 leading-snug">
-                Built-in <code className="font-mono">mygit login</code> authenticates against your cloud database.
+                Seamless <code className="font-mono">mygit login</code> with user-isolated Neon storage.
               </p>
             </div>
           </div>
         </div>
 
-        {/* Live Terminal Flow Preview */}
-        <div className="mt-8 rounded-2xl border border-neutral-300 dark:border-neutral-800 bg-[#07090c] p-5 font-mono text-xs sm:text-[13px] leading-relaxed shadow-lg">
-          <div className="flex items-center justify-between pb-3 mb-3 border-b border-neutral-800">
+        {/* Minimalist Terminal Walkthrough */}
+        <div className="mt-6 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-[#0c0d11] p-4 sm:p-5 font-mono text-xs leading-relaxed text-neutral-300 shadow-inner">
+          <div className="flex items-center justify-between pb-3 mb-3 border-b border-neutral-800/80">
             <div className="flex items-center gap-1.5">
-              <div className="size-2.5 rounded-full bg-red-500/80" />
-              <div className="size-2.5 rounded-full bg-yellow-500/80" />
-              <div className="size-2.5 rounded-full bg-green-500/80" />
-              <span className="text-[11px] text-neutral-400 ml-2 font-sans font-medium">Terminal Session</span>
+              <div className="size-2 rounded-full bg-neutral-700" />
+              <div className="size-2 rounded-full bg-neutral-700" />
+              <div className="size-2 rounded-full bg-neutral-700" />
+              <span className="text-[11px] text-neutral-500 ml-2 font-sans font-medium">terminal preview</span>
             </div>
-            <span className="text-[10px] text-neutral-500 uppercase tracking-widest font-mono">mygit CLI v0.1.0</span>
+            <span className="text-[10px] text-neutral-500 font-mono">mygit v0.1.0</span>
           </div>
 
-          <div className="space-y-3.5">
+          <div className="space-y-3 text-[11px] sm:text-xs">
             <div>
-              <span className="text-[#9dff3a] font-bold">PS C:\workspace&gt;</span>{" "}
-              <span className="text-white">mygit login</span>
+              <span className="text-neutral-500">PS C:\&gt;</span> <span className="text-white font-medium">mygit login</span>
               <div className="text-neutral-400 text-[11px] mt-0.5 pl-3 border-l border-neutral-800">
                 Email: oraut860@gmail.com<br />
                 Password: ••••••••<br />
-                <span className="text-[#9dff3a]">✓ Authenticated successfully as 'omraut' (User ID: 4)</span><br />
-                <span className="text-neutral-500">✓ Token saved securely to ~/.mygit/credentials</span>
+                <span className="text-neutral-300">✓ Authenticated as 'omraut' (User ID: 4)</span>
               </div>
             </div>
 
             <div>
-              <span className="text-[#9dff3a] font-bold">PS C:\workspace&gt;</span>{" "}
-              <span className="text-white">mygit init my-project</span>
+              <span className="text-neutral-500">PS C:\&gt;</span> <span className="text-white font-medium">mygit init my-app</span>
               <div className="text-neutral-400 text-[11px] mt-0.5 pl-3 border-l border-neutral-800">
-                Initialized empty mygit repository in C:\workspace\my-project\.mygit\
+                Initialized empty mygit repository in C:\my-app\.mygit\
               </div>
             </div>
 
             <div>
-              <span className="text-[#9dff3a] font-bold">PS C:\workspace\my-project&gt;</span>{" "}
-              <span className="text-white">mygit add . && mygit commit -m "Byte-compatible initial commit"</span>
+              <span className="text-neutral-500">PS C:\my-app&gt;</span> <span className="text-white font-medium">mygit add . && mygit commit -m "Initial commit"</span>
               <div className="text-neutral-400 text-[11px] mt-0.5 pl-3 border-l border-neutral-800">
-                [main (root-commit) 4a8b1c9] Byte-compatible initial commit<br />
-                <span className="text-neutral-500"> 3 files changed, 94 insertions(+)</span>
+                [main (root-commit) 4a8b1c9] Initial commit (2 files changed, 48 insertions)
               </div>
             </div>
           </div>
