@@ -4,11 +4,10 @@ import ReactDOM from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 
-const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
-
-if (!PUBLISHABLE_KEY) {
-  console.warn("Missing VITE_CLERK_PUBLISHABLE_KEY in environment variables");
-}
+const PUBLISHABLE_KEY =
+  import.meta.env.VITE_CLERK_PUBLISHABLE_KEY ||
+  (import.meta.env as unknown as Record<string, string>).NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ||
+  'pk_test_ZXF1aXBwZWQtbGlnZXItMjE1My5jbGVyay5hY2NvdW50cy5kZXYk';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

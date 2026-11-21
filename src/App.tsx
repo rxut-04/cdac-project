@@ -110,10 +110,6 @@ export default function App() {
           if (values.email) setUserEmail(values.email);
           navigate("dashboard");
         }}
-        onProviderSignIn={async (provider) => {
-          setUserEmail(`alex.${provider}@mygit.dev`);
-          navigate("dashboard");
-        }}
         footer={
           <p className="text-[12px] text-neutral-500">
             By signing in, you agree to mygit&apos;s Terms of Service and Privacy Policy.
@@ -134,10 +130,6 @@ export default function App() {
         onBackHome={() => navigate("home")}
         onSubmit={async (values) => {
           if (values.email) setUserEmail(values.email);
-          navigate("dashboard");
-        }}
-        onProviderSignIn={async (provider) => {
-          setUserEmail(`alex.${provider}@mygit.dev`);
           navigate("dashboard");
         }}
         footer={

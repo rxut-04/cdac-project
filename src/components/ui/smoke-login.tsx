@@ -25,7 +25,7 @@ import {
 } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { ArrowLeft, ArrowRight, Eye, EyeOff, LoaderCircle, Moon, Sun, AlertCircle } from "lucide-react";
-import { useSignIn, useSignUp } from "@clerk/react";
+import { useClerk, useSignIn, useSignUp } from "@clerk/react";
 import { cn } from "@/lib/utils";
 
 export type SmokeLoginProvider = "apple" | "google";
@@ -110,8 +110,9 @@ export function SmokeLogin({
   const [pendingVerification, setPendingVerification] = useState(false);
   const [verificationCode, setVerificationCode] = useState("");
 
-  const { signIn, isLoaded: signInLoaded, setActive: setActiveSignIn } = useSignIn();
-  const { signUp, isLoaded: signUpLoaded, setActive: setActiveSignUp } = useSignUp();
+  const clerk = useClerk();
+  const signIn = useSignIn();
+  const signUp = useSignUp();
 
   const reduce = useReducedMotion();
   const dark = theme === "dark";
@@ -128,14 +129,14 @@ export function SmokeLogin({
 
     // 1. If currently in sign-up verification phase:
     if (isSignUp && pendingVerification) {
-      if (!signUpLoaded || !signUp) return;
+      if (!signUp) return;
       setBusy("form");
       try {
         const completeSignUp = await signUp.attemptEmailAddressVerification({
           code: verificationCode.trim(),
         });
         if (completeSignUp.status === "complete") {
-          await setActiveSignUp({ session: completeSignUp.createdSessionId });
+          await clerk.setActive({ session: completeSignUp.createdSessionId });
           await onSubmit({ email: emailVal, password: pwVal, name: nameVal });
         } else {
           setErrorMsg("Verification incomplete. Please check your code and try again.");
@@ -153,13 +154,13 @@ export function SmokeLogin({
     if (!isSignUp) {
       setBusy("form");
       try {
-        if (signInLoaded && signIn) {
+        if (signIn?.create) {
           const result = await signIn.create({
             identifier: emailVal,
             password: pwVal,
           });
           if (result.status === "complete") {
-            await setActiveSignIn({ session: result.createdSessionId });
+            await clerk.setActive({ session: result.createdSessionId });
             await onSubmit({ email: emailVal, password: pwVal });
             return;
           } else {
@@ -169,7 +170,7 @@ export function SmokeLogin({
         await onSubmit({ email: emailVal, password: pwVal });
       } catch (err: unknown) {
         const clerkErr = err as { errors?: Array<{ message: string }>; message?: string };
-        setErrorMsg(clerkErr.errors?.[0]?.message || clerkErr.message || "Invalid email or password");
+        setErrorMsg(clerkErr.errors?.[0]?.message || clerkErr.message || "Invalid credentials");
       } finally {
         setBusy(null);
       }
@@ -180,7 +181,7 @@ export function SmokeLogin({
     if (isSignUp) {
       setBusy("form");
       try {
-        if (signUpLoaded && signUp) {
+        if (signUp?.create) {
           const [firstName, ...rest] = nameVal.trim().split(" ");
           const lastName = rest.join(" ");
           const result = await signUp.create({
@@ -191,7 +192,7 @@ export function SmokeLogin({
           });
 
           if (result.status === "complete") {
-            await setActiveSignUp({ session: result.createdSessionId });
+            await clerk.setActive({ session: result.createdSessionId });
             await onSubmit({ email: emailVal, password: pwVal, name: nameVal });
             return;
           } else if (result.status === "missing_requirements") {
@@ -217,9 +218,16 @@ export function SmokeLogin({
     const strategy = p === "google" ? "oauth_google" : "oauth_apple";
 
     try {
+      if (!clerk.loaded) {
+        setErrorMsg("Authentication service is loading. Please try again in a few seconds.");
+        setBusy(null);
+        return;
+      }
+
       if (isSignUp) {
-        if (signUpLoaded && signUp) {
-          await signUp.authenticateWithRedirect({
+        const clientSignUp = clerk.client?.signUp;
+        if (clientSignUp?.authenticateWithRedirect) {
+          await clientSignUp.authenticateWithRedirect({
             strategy,
             redirectUrl: `${window.location.origin}/sso-callback`,
             redirectUrlComplete: `${window.location.origin}/#dashboard`,
@@ -227,8 +235,9 @@ export function SmokeLogin({
           return;
         }
       } else {
-        if (signInLoaded && signIn) {
-          await signIn.authenticateWithRedirect({
+        const clientSignIn = clerk.client?.signIn;
+        if (clientSignIn?.authenticateWithRedirect) {
+          await clientSignIn.authenticateWithRedirect({
             strategy,
             redirectUrl: `${window.location.origin}/sso-callback`,
             redirectUrlComplete: `${window.location.origin}/#dashboard`,
@@ -236,8 +245,9 @@ export function SmokeLogin({
           return;
         }
       }
-      await onProviderSignIn(p);
+      throw new Error(`Unable to start authentication with ${p}.`);
     } catch (err: unknown) {
+      console.error("Clerk OAuth error:", err);
       const clerkErr = err as { errors?: Array<{ message: string }>; message?: string };
       setErrorMsg(clerkErr.errors?.[0]?.message || clerkErr.message || `Failed to sign in with ${p}`);
       setBusy(null);
