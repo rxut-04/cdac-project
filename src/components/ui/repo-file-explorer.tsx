@@ -217,12 +217,20 @@ function buildTreeNodes(files: RepoFile[]): FileTreeNode[] {
 }
 
 function getLanguageForPath(path: string): string {
+  if (path.endsWith(".java")) return "java";
   if (path.endsWith(".ts") || path.endsWith(".tsx")) return "typescript";
   if (path.endsWith(".js") || path.endsWith(".jsx")) return "javascript";
   if (path.endsWith(".json")) return "json";
+  if (path.endsWith(".html") || path.endsWith(".htm")) return "html";
+  if (path.endsWith(".css")) return "css";
+  if (path.endsWith(".sql")) return "sql";
+  if (path.endsWith(".xml")) return "xml";
   if (path.endsWith(".md")) return "markdown";
   if (path.endsWith(".sh") || path.endsWith(".bash")) return "bash";
   if (path.endsWith(".py")) return "python";
+  if (path.endsWith(".go")) return "go";
+  if (path.endsWith(".rs")) return "rust";
+  if (path.endsWith(".cpp") || path.endsWith(".c") || path.endsWith(".h")) return "cpp";
   if (path.endsWith(".yml") || path.endsWith(".yaml")) return "yaml";
   return "text";
 }
