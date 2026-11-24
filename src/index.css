@@ -15,6 +15,8 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent-pro: var(--accent-pro);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
 }
 
 :root {
@@ -25,6 +27,8 @@
   --border: #e2e8f0;
   --card: #ffffff;
   --card-foreground: #090d12;
+  --popover: #ffffff;
+  --popover-foreground: #090d12;
   --primary: #090d12;
   --primary-foreground: #ffffff;
   --accent: #f1f5f9;
@@ -40,6 +44,8 @@
   --border: #1b232e;
   --card: #0e141d;
   --card-foreground: #f3f4f6;
+  --popover: #0e141d;
+  --popover-foreground: #f3f4f6;
   --primary: #f9fafb;
   --primary-foreground: #090d12;
   --accent: #1e2631;

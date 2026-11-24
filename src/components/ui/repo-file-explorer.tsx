@@ -975,73 +975,76 @@ export function RepoFileExplorer({
               </button>
 
               {codeDropdownOpen && (
-                <div
-                  className="absolute right-0 mt-2 w-80 rounded-xl border border-border/60 bg-popover text-popover-foreground shadow-xl p-3.5 z-50 text-xs font-sans space-y-3 animate-in fade-in zoom-in-95 duration-150"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <div className="flex items-center justify-between font-semibold text-foreground/90 border-b border-border/30 pb-2">
-                    <span className="flex items-center gap-1.5">
-                      <Terminal className="size-3.5 text-emerald-400" />
-                      Clone repository
-                    </span>
-                    <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
-                      HTTPS / CLI
-                    </span>
-                  </div>
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setCodeDropdownOpen(false)} />
+                  <div
+                    className="absolute right-0 mt-2 w-80 rounded-xl border border-border/80 bg-white dark:bg-[#0e141d] text-foreground shadow-2xl p-4 z-50 text-xs font-sans space-y-3.5 animate-in fade-in zoom-in-95 duration-150"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="flex items-center justify-between font-semibold text-foreground border-b border-border/50 pb-2.5">
+                      <span className="flex items-center gap-1.5 font-medium">
+                        <Terminal className="size-3.5 text-emerald-500 dark:text-emerald-400" />
+                        Clone repository
+                      </span>
+                      <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 font-semibold">
+                        HTTPS / CLI
+                      </span>
+                    </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-mono text-foreground/60">Clone with Web URL</label>
-                    <div className="flex items-center gap-1.5 bg-foreground/5 border border-border/40 rounded-lg p-1.5">
-                      <input
-                        type="text"
-                        readOnly
-                        value={httpsUrl}
-                        className="bg-transparent text-[11px] font-mono text-foreground/80 flex-1 truncate outline-none select-all px-1"
-                      />
-                      <button
-                        type="button"
-                        onClick={copyHttpsUrl}
-                        className="p-1 rounded text-foreground/60 hover:text-foreground hover:bg-foreground/10 transition-colors"
-                        title="Copy HTTPS URL"
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-mono text-foreground/70 font-medium">Clone with Web URL</label>
+                      <div className="flex items-center gap-1.5 bg-neutral-100 dark:bg-neutral-900 border border-border/60 rounded-lg p-1.5">
+                        <input
+                          type="text"
+                          readOnly
+                          value={httpsUrl}
+                          className="bg-transparent text-[11px] font-mono text-foreground flex-1 truncate outline-none select-all px-1"
+                        />
+                        <button
+                          type="button"
+                          onClick={copyHttpsUrl}
+                          className="p-1 rounded text-foreground/60 hover:text-foreground hover:bg-foreground/10 transition-colors"
+                          title="Copy HTTPS URL"
+                        >
+                          {copiedHttps ? <Check className="size-3.5 text-emerald-500 dark:text-emerald-400" /> : <Copy className="size-3.5" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-mono text-foreground/70 font-medium">mygit CLI command</label>
+                      <div className="flex items-center gap-1.5 bg-neutral-100 dark:bg-neutral-900 border border-border/60 rounded-lg p-1.5">
+                        <span className="text-foreground/40 font-mono text-[11px] pl-1 select-none font-semibold">$</span>
+                        <input
+                          type="text"
+                          readOnly
+                          value={cloneCmd}
+                          className="bg-transparent text-[11px] font-mono text-foreground flex-1 truncate outline-none select-all px-1"
+                        />
+                        <button
+                          type="button"
+                          onClick={copyCloneCmd}
+                          className="p-1 rounded text-foreground/60 hover:text-foreground hover:bg-foreground/10 transition-colors"
+                          title="Copy CLI command"
+                        >
+                          {copiedClone ? <Check className="size-3.5 text-emerald-500 dark:text-emerald-400" /> : <Copy className="size-3.5" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="pt-1.5 border-t border-border/50">
+                      <a
+                        href={downloadZipUrl}
+                        download={`${currentRepoName}-${currentBranch}.zip`}
+                        className="flex items-center justify-center gap-2 w-full py-2 rounded-lg bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-900 dark:hover:bg-neutral-800 border border-border/60 text-foreground text-xs font-medium transition-colors"
+                        onClick={() => setCodeDropdownOpen(false)}
                       >
-                        {copiedHttps ? <Check className="size-3.5 text-emerald-400" /> : <Copy className="size-3.5" />}
-                      </button>
+                        <Download className="size-3.5 text-emerald-500 dark:text-emerald-400" />
+                        <span>Download ZIP Archive</span>
+                      </a>
                     </div>
                   </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-mono text-foreground/60">mygit CLI command</label>
-                    <div className="flex items-center gap-1.5 bg-foreground/5 border border-border/40 rounded-lg p-1.5">
-                      <span className="text-foreground/40 font-mono text-[11px] pl-1 select-none">$</span>
-                      <input
-                        type="text"
-                        readOnly
-                        value={cloneCmd}
-                        className="bg-transparent text-[11px] font-mono text-foreground/80 flex-1 truncate outline-none select-all px-1"
-                      />
-                      <button
-                        type="button"
-                        onClick={copyCloneCmd}
-                        className="p-1 rounded text-foreground/60 hover:text-foreground hover:bg-foreground/10 transition-colors"
-                        title="Copy CLI command"
-                      >
-                        {copiedClone ? <Check className="size-3.5 text-emerald-400" /> : <Copy className="size-3.5" />}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="pt-1 border-t border-border/30">
-                    <a
-                      href={downloadZipUrl}
-                      download={`${currentRepoName}-${currentBranch}.zip`}
-                      className="flex items-center justify-center gap-2 w-full py-2 rounded-lg bg-foreground/5 hover:bg-foreground/10 border border-border/40 text-foreground text-xs font-medium transition-colors"
-                      onClick={() => setCodeDropdownOpen(false)}
-                    >
-                      <Download className="size-3.5 text-emerald-400" />
-                      <span>Download ZIP Archive</span>
-                    </a>
-                  </div>
-                </div>
+                </>
               )}
             </div>
           </div>
@@ -1114,43 +1117,46 @@ export function RepoFileExplorer({
             </button>
 
             {branchDropdownOpen && (
-              <div
-                className="absolute left-0 mt-2 w-64 rounded-xl border border-border/60 bg-popover text-popover-foreground shadow-xl p-2 z-50 text-xs space-y-2 animate-in fade-in zoom-in-95 duration-150"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="px-2 py-1 font-semibold text-foreground/90 border-b border-border/30 text-[11px]">
-                  Switch branch
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setBranchDropdownOpen(false)} />
+                <div
+                  className="absolute left-0 mt-2 w-64 rounded-xl border border-border/80 bg-white dark:bg-[#0e141d] text-foreground shadow-2xl p-2.5 z-50 text-xs space-y-2 animate-in fade-in zoom-in-95 duration-150"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="px-2 py-1 font-semibold text-foreground border-b border-border/50 text-[11px]">
+                    Switch branch
+                  </div>
+                  <div className="px-1">
+                    <input
+                      type="text"
+                      placeholder="Find a branch..."
+                      value={branchSearch}
+                      onChange={(e) => setBranchSearch(e.target.value)}
+                      className="w-full bg-neutral-100 dark:bg-neutral-900 border border-border/60 rounded-md px-2 py-1.5 text-xs text-foreground placeholder:text-foreground/40 focus:outline-none focus:border-emerald-500/60"
+                    />
+                  </div>
+                  <div className="max-h-44 overflow-y-auto space-y-0.5">
+                    {filteredBranches.map((b) => (
+                      <button
+                        key={b.name}
+                        type="button"
+                        onClick={() => {
+                          setCurrentBranch(b.name);
+                          setBranchDropdownOpen(false);
+                        }}
+                        className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-left font-mono text-xs transition-colors ${
+                          currentBranch === b.name
+                            ? "bg-emerald-500/15 text-emerald-500 dark:text-emerald-400 font-semibold"
+                            : "hover:bg-neutral-100 dark:hover:bg-neutral-800 text-foreground/80 hover:text-foreground"
+                        }`}
+                      >
+                        <span className="truncate">{b.name}</span>
+                        {currentBranch === b.name && <Check className="size-3 text-emerald-500 dark:text-emerald-400" />}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <div className="px-1">
-                  <input
-                    type="text"
-                    placeholder="Find a branch..."
-                    value={branchSearch}
-                    onChange={(e) => setBranchSearch(e.target.value)}
-                    className="w-full bg-foreground/5 border border-border/40 rounded-md px-2 py-1 text-xs text-foreground placeholder:text-foreground/30 focus:outline-none"
-                  />
-                </div>
-                <div className="max-h-44 overflow-y-auto space-y-0.5">
-                  {filteredBranches.map((b) => (
-                    <button
-                      key={b.name}
-                      type="button"
-                      onClick={() => {
-                        setCurrentBranch(b.name);
-                        setBranchDropdownOpen(false);
-                      }}
-                      className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-left font-mono text-xs transition-colors ${
-                        currentBranch === b.name
-                          ? "bg-emerald-500/15 text-emerald-400 font-semibold"
-                          : "hover:bg-foreground/5 text-foreground/75"
-                      }`}
-                    >
-                      <span className="truncate">{b.name}</span>
-                      {currentBranch === b.name && <Check className="size-3 text-emerald-400" />}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              </>
             )}
           </div>
 
