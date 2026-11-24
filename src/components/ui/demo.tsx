@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/navigation-menu";
 import { MobileNav } from "@/components/ui/navbar";
 import { LiquidGlassLogo, type LiquidGlassLogoHandle } from "@/components/liquid-glass-logo";
-import { LiquidGlassOrb, type LiquidGlassOrbState } from "@/components/liquid-glass-orb";
+import { ElevenLabsOrb } from "@/components/ui/elevenlabs-orb";
 import { cn } from "@/lib/utils";
 
 const mygitComparisonData: ComparisonData = {
@@ -100,7 +100,6 @@ export default function DemoOne({
 }) {
   const [authModal, setAuthModal] = useState<"login" | "signup" | null>(null);
   const logoRef = React.useRef<LiquidGlassLogoHandle>(null);
-  const [orbState, setOrbState] = useState<LiquidGlassOrbState>("idle");
   const [theme, setTheme] = useState<"light" | "dark">(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("mygit-theme");
@@ -229,71 +228,13 @@ export default function DemoOne({
           </NavigationMenuList>
         </NavigationMenu>
 
-        {/* Right Action: Liquid Glass Orb (Voice AI) & Theme Toggle (Right Only) */}
+        {/* Right Action: ElevenLabs Voice Orb AI & Theme Toggle (Right Only) */}
         <div className="flex flex-1 items-center justify-end gap-2.5">
-          {/* ElevenLabs Liquid Glass Voice Orb */}
-          <button
-            type="button"
-            onClick={() => {
-              setOrbState((prev) => {
-                const next: Record<LiquidGlassOrbState, LiquidGlassOrbState> = {
-                  idle: "listening",
-                  listening: "speaking",
-                  speaking: "thinking",
-                  thinking: "searching",
-                  searching: "success",
-                  success: "idle",
-                  error: "idle",
-                };
-                return next[prev] || "idle";
-              });
-            }}
-            className="relative group p-0.5 rounded-full cursor-pointer focus:outline-hidden hover:scale-105 active:scale-95 transition-transform"
-            title={`ElevenLabs AI Voice Orb (${orbState}) · Click to toggle state`}
-            aria-label={`ElevenLabs Voice Assistant: ${orbState}`}
-          >
-            <div className="relative w-9 h-9 rounded-full overflow-hidden flex items-center justify-center shadow-xs border border-neutral-300/80 dark:border-neutral-700/80 bg-neutral-950 shrink-0">
-              <LiquidGlassOrb
-                baseColor="#ffffff"
-                colorA="#000000"
-                colorB="#4d4d4d"
-                colorC="#a9a9a9"
-                seed={145}
-                startTime={18}
-                speed={1.5}
-                distortion={0.8}
-                clusterCount={7.2}
-                clusterIntensity={3}
-                clusterSize={22.5}
-                scale={0.23}
-                spotSize={1.15}
-                rotation={0}
-                softness={0.31}
-                relief={2.94}
-                refraction={0.65}
-                roughness={0}
-                reflection={1.3}
-                caustics={0}
-                dispersion={1}
-                colorDistribution={0}
-                grain={0.3}
-                grainSize={1}
-                paused={false}
-                animateDistortion={true}
-                grainMode="fine"
-                flowType="drift"
-                state={orbState}
-                thinkingAnimation="ripples"
-                searchingAnimation="lens"
-                preserveWhites={true}
-                animateEntrance={true}
-                size={36}
-                audioLevel={orbState === "speaking" ? 0.85 : orbState === "listening" ? 0.6 : 0.3}
-                className="!w-full !h-full"
-                style={{ width: "100%", height: "100%" }}
-              />
-            </div>
-          </button>
+          {/* ElevenLabs Voice Orb */}
+          <ElevenLabsOrb
+            apiKey="sk_73579988aac7e4e1d130566fab67bf2e94f1f6edb6032b14"
+            agentId="cBTYF7NiJbR8Bvmdeuse"
+          />
 
           {/* Light / Dark Mode Toggle */}
           <button
