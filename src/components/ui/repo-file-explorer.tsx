@@ -9,10 +9,13 @@ import {
   FileTreeStatus,
 } from "@/components/ui/file-tree";
 import { CodeBlock } from "@/components/ui/code-block";
+import { DiffViewer, FileDiff } from "@/components/ui/diff-viewer";
 import {
   ArrowLeft,
   GitBranch,
   GitCommit,
+  GitPullRequest,
+  GitMerge,
   Copy,
   Check,
   FolderGit2,
@@ -27,8 +30,12 @@ import {
   Clock,
   User,
   BookOpen,
-  Calendar,
   Layers,
+  MessageSquare,
+  Plus,
+  Send,
+  AlertCircle,
+  CheckCircle2,
 } from "lucide-react";
 
 export interface RepoFileExplorerProps {
@@ -60,12 +67,54 @@ interface RepoCommitItem {
   pushedAt: string;
 }
 
+interface CommitDiffData {
+  commitSha: string;
+  parentSha?: string;
+  treeSha?: string;
+  message: string;
+  authorName: string;
+  authorEmail?: string;
+  authoredAt: string;
+  totalAdditions: number;
+  totalDeletions: number;
+  filesChangedCount: number;
+  files: FileDiff[];
+}
+
+interface PullRequestItem {
+  id: number;
+  number: number;
+  title: string;
+  description?: string;
+  sourceBranch: string;
+  targetBranch: string;
+  status: "OPEN" | "MERGED" | "CLOSED" | string;
+  authorUsername: string;
+  createdAt: string;
+  updatedAt: string;
+  mergedAt?: string;
+  mergedByUsername?: string;
+}
+
+interface PullRequestDetail extends PullRequestItem {
+  totalAdditions?: number;
+  totalDeletions?: number;
+  filesChangedCount?: number;
+  files?: FileDiff[];
+  comments?: Array<{
+    id: number;
+    authorUsername: string;
+    commentText: string;
+    createdAt: string;
+  }>;
+}
+
 interface BranchItem {
   name: string;
   isDefault: boolean;
 }
 
-// Generate fallback initial files
+// Fallback initial files
 function getInitialFilesForRepo(repoName: string, owner: string): RepoFile[] {
   return [
     {
@@ -92,11 +141,6 @@ mygit add .
 mygit commit -m "feat: first update"
 mygit push origin main
 \`\`\`
-
-## Architecture & Notes
-- Byte-compatible with standard Git protocols
-- Stored across high-availability Neon PostgreSQL objects table
-- Connected to cloud API services on Render
 `,
     },
     {
@@ -224,7 +268,6 @@ function renderMarkdownContent(content: string) {
   const elements: React.ReactNode[] = [];
   let inCodeBlock = false;
   let codeBuffer: string[] = [];
-  let codeLanguage = "";
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -240,7 +283,6 @@ function renderMarkdownContent(content: string) {
         inCodeBlock = false;
       } else {
         inCodeBlock = true;
-        codeLanguage = line.slice(3).trim();
       }
       continue;
     }
@@ -307,10 +349,9 @@ export function RepoFileExplorer({
   const [files, setFiles] = useState<RepoFile[]>(initialFiles);
   const [selectedPath, setSelectedPath] = useState<string>("README.md");
   const [searchQuery, setSearchQuery] = useState("");
-  const [loadingFiles, setLoadingFiles] = useState(false);
 
-  // Tabs: "code" vs "commits"
-  const [activeTab, setActiveTab] = useState<"code" | "commits">("code");
+  // Navigation Tabs: "code" | "commits" | "pulls"
+  const [activeTab, setActiveTab] = useState<"code" | "commits" | "pulls">("code");
 
   // Branches
   const [branches, setBranches] = useState<BranchItem[]>([{ name: "main", isDefault: true }]);
@@ -318,10 +359,27 @@ export function RepoFileExplorer({
   const [branchDropdownOpen, setBranchDropdownOpen] = useState(false);
   const [branchSearch, setBranchSearch] = useState("");
 
-  // Commits
+  // Commits & Commit Diff
   const [commits, setCommits] = useState<RepoCommitItem[]>([]);
-  const [loadingCommits, setLoadingCommits] = useState(false);
-  const [selectedCommit, setSelectedCommit] = useState<RepoCommitItem | null>(null);
+  const [selectedCommitSha, setSelectedCommitSha] = useState<string | null>(null);
+  const [commitDiffData, setCommitDiffData] = useState<CommitDiffData | null>(null);
+  const [loadingCommitDiff, setLoadingCommitDiff] = useState(false);
+
+  // Pull Requests
+  const [pullRequests, setPullRequests] = useState<PullRequestItem[]>([]);
+  const [loadingPulls, setLoadingPulls] = useState(false);
+  const [selectedPrNumber, setSelectedPrNumber] = useState<number | null>(null);
+  const [prDetail, setPrDetail] = useState<PullRequestDetail | null>(null);
+  const [loadingPrDetail, setLoadingPrDetail] = useState(false);
+  const [isCreatingPr, setIsCreatingPr] = useState(false);
+  const [newPrTitle, setNewPrTitle] = useState("");
+  const [newPrDesc, setNewPrDesc] = useState("");
+  const [newPrSource, setNewPrSource] = useState("");
+  const [newPrTarget, setNewPrTarget] = useState("main");
+  const [prSubmitting, setPrSubmitting] = useState(false);
+  const [prCommentText, setPrCommentText] = useState("");
+  const [prMerging, setPrMerging] = useState(false);
+  const [prStatusFilter, setPrStatusFilter] = useState<"ALL" | "OPEN" | "MERGED">("ALL");
 
   // Code ▾ dropdown
   const [codeDropdownOpen, setCodeDropdownOpen] = useState(false);
@@ -339,15 +397,18 @@ export function RepoFileExplorer({
       .then((res) => {
         if (Array.isArray(res.data) && res.data.length > 0) {
           setBranches(res.data);
+          if (!newPrSource && res.data.length > 1) {
+            const nonMain = res.data.find((b: any) => b.name !== "main");
+            if (nonMain) setNewPrSource(nonMain.name);
+          }
         }
       })
       .catch(() => {});
   }, [repoName]);
 
-  // Fetch files whenever branch changes
+  // Fetch files for active branch
   useEffect(() => {
     let isMounted = true;
-    setLoadingFiles(true);
     api.get(`/repos/${encodeURIComponent(repoName)}/files?branch=${encodeURIComponent(currentBranch)}`)
       .then((res) => {
         if (!isMounted) return;
@@ -361,10 +422,7 @@ export function RepoFileExplorer({
           setSelectedPath(liveFiles[0]?.path || "README.md");
         }
       })
-      .catch(() => {})
-      .finally(() => {
-        if (isMounted) setLoadingFiles(false);
-      });
+      .catch(() => {});
 
     return () => { isMounted = false; };
   }, [repoName, currentBranch]);
@@ -372,7 +430,6 @@ export function RepoFileExplorer({
   // Fetch commits
   useEffect(() => {
     let isMounted = true;
-    setLoadingCommits(true);
     api.get(`/repos/${encodeURIComponent(repoName)}/commits`)
       .then((res) => {
         if (!isMounted) return;
@@ -380,13 +437,120 @@ export function RepoFileExplorer({
           setCommits(res.data);
         }
       })
-      .catch(() => {})
-      .finally(() => {
-        if (isMounted) setLoadingCommits(false);
-      });
+      .catch(() => {});
 
     return () => { isMounted = false; };
   }, [repoName]);
+
+  // Fetch Pull Requests
+  const fetchPullRequests = () => {
+    setLoadingPulls(true);
+    api.get(`/repos/${encodeURIComponent(repoName)}/pulls?status=${prStatusFilter}`)
+      .then((res) => {
+        if (Array.isArray(res.data)) {
+          setPullRequests(res.data);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoadingPulls(false));
+  };
+
+  useEffect(() => {
+    fetchPullRequests();
+  }, [repoName, prStatusFilter]);
+
+  // Fetch commit diff when a commit is selected
+  useEffect(() => {
+    if (!selectedCommitSha) {
+      setCommitDiffData(null);
+      return;
+    }
+    setLoadingCommitDiff(true);
+    api.get(`/repos/${encodeURIComponent(repoName)}/commits/${encodeURIComponent(selectedCommitSha)}/diff`)
+      .then((res) => {
+        if (res.data) setCommitDiffData(res.data);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingCommitDiff(false));
+  }, [repoName, selectedCommitSha]);
+
+  // Fetch PR detail when a PR is selected
+  const loadPrDetail = (num: number) => {
+    setLoadingPrDetail(true);
+    api.get(`/repos/${encodeURIComponent(repoName)}/pulls/${num}`)
+      .then((res) => {
+        if (res.data) setPrDetail(res.data);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingPrDetail(false));
+  };
+
+  useEffect(() => {
+    if (selectedPrNumber !== null) {
+      loadPrDetail(selectedPrNumber);
+    } else {
+      setPrDetail(null);
+    }
+  }, [repoName, selectedPrNumber]);
+
+  // Create PR
+  const handleCreatePr = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPrTitle.trim() || !newPrSource.trim()) return;
+
+    setPrSubmitting(true);
+    api.post(`/repos/${encodeURIComponent(repoName)}/pulls`, {
+      title: newPrTitle.trim(),
+      description: newPrDesc.trim(),
+      sourceBranch: newPrSource.trim(),
+      targetBranch: newPrTarget.trim() || "main",
+    })
+      .then((res) => {
+        setIsCreatingPr(false);
+        setNewPrTitle("");
+        setNewPrDesc("");
+        fetchPullRequests();
+        if (res.data?.number) {
+          setSelectedPrNumber(res.data.number);
+        }
+      })
+      .catch((err) => {
+        alert(err.response?.data?.error || "Failed to create pull request");
+      })
+      .finally(() => setPrSubmitting(false));
+  };
+
+  // Merge PR
+  const handleMergePr = () => {
+    if (!selectedPrNumber) return;
+    setPrMerging(true);
+    api.post(`/repos/${encodeURIComponent(repoName)}/pulls/${selectedPrNumber}/merge`)
+      .then(() => {
+        loadPrDetail(selectedPrNumber);
+        fetchPullRequests();
+      })
+      .catch((err) => {
+        alert(err.response?.data?.error || "Merge failed");
+      })
+      .finally(() => setPrMerging(false));
+  };
+
+  // Submit PR Comment
+  const handleAddComment = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedPrNumber || !prCommentText.trim()) return;
+
+    api.post(`/repos/${encodeURIComponent(repoName)}/pulls/${selectedPrNumber}/comments`, {
+      commentText: prCommentText.trim(),
+    })
+      .then(() => {
+        setPrCommentText("");
+        loadPrDetail(selectedPrNumber);
+      })
+      .catch((err) => {
+        alert(err.response?.data?.error || "Failed to post comment");
+      });
+  };
 
   const copyCloneCmd = () => {
     navigator.clipboard.writeText(cloneCmd);
@@ -418,7 +582,6 @@ export function RepoFileExplorer({
     return files.find((f) => f.path === selectedPath) || files[0];
   }, [files, selectedPath]);
 
-  // Auto-detect README file for GitHub-style bottom preview
   const readmeFile = useMemo(() => {
     return files.find((f) => f.path.toLowerCase() === "readme.md");
   }, [files]);
@@ -469,7 +632,6 @@ export function RepoFileExplorer({
                   </span>
                 </div>
 
-                {/* HTTPS Clone URL */}
                 <div className="space-y-1.5">
                   <label className="text-[11px] font-mono text-foreground/60">Clone with Web URL</label>
                   <div className="flex items-center gap-1.5 bg-foreground/5 border border-border/40 rounded-lg p-1.5">
@@ -490,7 +652,6 @@ export function RepoFileExplorer({
                   </div>
                 </div>
 
-                {/* CLI Command */}
                 <div className="space-y-1.5">
                   <label className="text-[11px] font-mono text-foreground/60">mygit CLI command</label>
                   <div className="flex items-center gap-1.5 bg-foreground/5 border border-border/40 rounded-lg p-1.5">
@@ -512,7 +673,6 @@ export function RepoFileExplorer({
                   </div>
                 </div>
 
-                {/* Download ZIP button */}
                 <div className="pt-1 border-t border-border/30">
                   <a
                     href={downloadZipUrl}
@@ -554,7 +714,6 @@ export function RepoFileExplorer({
             )}
           </div>
 
-          {/* Quick Metrics */}
           <div className="flex items-center gap-2 text-xs font-mono">
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-foreground/5 border border-border/40 text-foreground/75">
               <Layers className="size-3 text-emerald-400" />
@@ -564,12 +723,16 @@ export function RepoFileExplorer({
               <GitCommit className="size-3 text-sky-400" />
               <span>{commits.length} commits</span>
             </span>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-foreground/5 border border-border/40 text-foreground/75">
+              <GitPullRequest className="size-3 text-purple-400" />
+              <span>{pullRequests.length} PRs</span>
+            </span>
           </div>
         </div>
 
         {/* Tab Navigation & Branch Selector Bar */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
-          {/* GitHub-style Branch Dropdown */}
+          {/* Branch Dropdown */}
           <div className="relative">
             <button
               type="button"
@@ -622,11 +785,15 @@ export function RepoFileExplorer({
             )}
           </div>
 
-          {/* Navigation Tabs (Code vs Commits) */}
+          {/* Navigation Tabs (Code / Commits / Pull Requests) */}
           <div className="flex items-center gap-1 p-0.5 rounded-lg bg-foreground/5 border border-border/40">
             <button
               type="button"
-              onClick={() => setActiveTab("code")}
+              onClick={() => {
+                setActiveTab("code");
+                setSelectedCommitSha(null);
+                setSelectedPrNumber(null);
+              }}
               className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs font-medium transition-all ${
                 activeTab === "code"
                   ? "bg-foreground/15 text-foreground shadow-xs font-semibold"
@@ -639,7 +806,10 @@ export function RepoFileExplorer({
 
             <button
               type="button"
-              onClick={() => setActiveTab("commits")}
+              onClick={() => {
+                setActiveTab("commits");
+                setSelectedPrNumber(null);
+              }}
               className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs font-medium transition-all ${
                 activeTab === "commits"
                   ? "bg-foreground/15 text-foreground shadow-xs font-semibold"
@@ -650,6 +820,25 @@ export function RepoFileExplorer({
               <span>Commits</span>
               <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-foreground/10 text-foreground/70">
                 {commits.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab("pulls");
+                setSelectedCommitSha(null);
+              }}
+              className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs font-medium transition-all ${
+                activeTab === "pulls"
+                  ? "bg-foreground/15 text-foreground shadow-xs font-semibold"
+                  : "text-foreground/60 hover:text-foreground"
+              }`}
+            >
+              <GitPullRequest className="size-3.5 text-purple-400" />
+              <span>Pull Requests</span>
+              <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-foreground/10 text-foreground/70">
+                {pullRequests.length}
               </span>
             </button>
           </div>
@@ -672,7 +861,6 @@ export function RepoFileExplorer({
                 </span>
               </div>
 
-              {/* Quick Filter */}
               <div className="p-2 border-b border-border/30">
                 <div className="relative">
                   <Search className="size-3 text-foreground/40 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -686,7 +874,6 @@ export function RepoFileExplorer({
                 </div>
               </div>
 
-              {/* Virtualized FileTree */}
               <div className="flex-1 overflow-auto p-1.5">
                 <FileTree
                   nodes={treeNodes}
@@ -716,7 +903,7 @@ export function RepoFileExplorer({
             </div>
           </div>
 
-          {/* GitHub-style Automatic README Section */}
+          {/* Automatic README Section */}
           {readmeFile && (
             <div className="rounded-xl border border-border/50 bg-foreground/5 overflow-hidden shadow-sm">
               <div className="p-3 border-b border-border/40 flex items-center justify-between gap-2 bg-foreground/5">
@@ -734,93 +921,493 @@ export function RepoFileExplorer({
         </div>
       )}
 
-      {/* TAB 2: COMMIT HISTORY & DIFFS */}
+      {/* TAB 2: COMMIT HISTORY & COMMIT DIFF VIEWER */}
       {activeTab === "commits" && (
         <div className="space-y-4">
-          <div className="rounded-xl border border-border/50 bg-foreground/5 overflow-hidden shadow-sm">
-            <div className="p-3.5 border-b border-border/40 flex items-center justify-between bg-foreground/5">
-              <div className="flex items-center gap-2">
-                <GitCommit className="size-4 text-sky-400" />
-                <span className="text-xs font-semibold text-foreground">Commit History</span>
-                <span className="text-xs text-foreground/50 font-mono">on branch '{currentBranch}'</span>
-              </div>
-              <span className="text-xs font-mono text-foreground/40">{commits.length} total commits</span>
-            </div>
+          {selectedCommitSha ? (
+            /* OPTION B: Single Commit Diff Viewer */
+            <div className="space-y-4">
+              <div className="rounded-xl border border-border/50 bg-foreground/5 p-4 space-y-3">
+                <button
+                  type="button"
+                  onClick={() => setSelectedCommitSha(null)}
+                  className="inline-flex items-center gap-1.5 text-xs font-mono text-foreground/60 hover:text-foreground transition-colors"
+                >
+                  <ArrowLeft className="size-3.5" />
+                  <span>Back to all commits</span>
+                </button>
 
-            {loadingCommits ? (
-              <div className="p-8 text-center text-xs font-mono text-foreground/50">
-                Loading commits from Neon DB...
-              </div>
-            ) : commits.length === 0 ? (
-              <div className="p-8 text-center text-xs font-mono text-foreground/50">
-                No commit records found for this repository.
-              </div>
-            ) : (
-              <div className="divide-y divide-border/30">
-                {commits.map((c) => (
-                  <div
-                    key={c.commitSha}
-                    className="p-4 hover:bg-foreground/5 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-                  >
-                    <div className="space-y-1.5 flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-semibold text-foreground hover:text-emerald-400 transition-colors">
-                          {c.message}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-foreground/50 font-mono flex-wrap">
-                        <span className="inline-flex items-center gap-1 text-foreground/75">
-                          <User className="size-3" />
-                          <span>{c.authorName}</span>
-                        </span>
-                        <span>•</span>
-                        <span className="inline-flex items-center gap-1">
+                {loadingCommitDiff ? (
+                  <div className="py-8 text-center text-xs font-mono text-foreground/50">
+                    Computing commit diff from Neon DB...
+                  </div>
+                ) : commitDiffData ? (
+                  <div className="space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/30 pb-3">
+                      <div>
+                        <h3 className="text-base font-bold text-foreground">{commitDiffData.message}</h3>
+                        <div className="flex items-center gap-2 text-xs text-foreground/60 font-mono mt-1">
+                          <User className="size-3 text-emerald-400" />
+                          <span>{commitDiffData.authorName}</span>
+                          <span>•</span>
                           <Clock className="size-3" />
-                          <span>{formatRelativeTime(c.authoredAt || c.pushedAt)}</span>
+                          <span>{formatRelativeTime(commitDiffData.authoredAt)}</span>
+                          {commitDiffData.parentSha && (
+                            <>
+                              <span>•</span>
+                              <span className="text-[11px] text-foreground/40">parent {commitDiffData.parentSha.substring(0, 7)}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded border border-border/50 bg-foreground/5 text-xs font-mono text-foreground/80">
+                          {commitDiffData.commitSha.substring(0, 7)}
                         </span>
-                        {c.parentSha && (
+                        <div className="flex items-center gap-2 text-xs font-mono">
+                          <span className="text-emerald-400 font-semibold">+{commitDiffData.totalAdditions}</span>
+                          <span className="text-rose-400 font-semibold">-{commitDiffData.totalDeletions}</span>
+                          <span className="text-foreground/50">({commitDiffData.filesChangedCount} files)</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <DiffViewer files={commitDiffData.files} />
+                  </div>
+                ) : (
+                  <div className="py-4 text-xs text-rose-400 font-mono">Failed to load diff for commit.</div>
+                )}
+              </div>
+            </div>
+          ) : (
+            /* Commits Timeline List */
+            <div className="rounded-xl border border-border/50 bg-foreground/5 overflow-hidden shadow-sm">
+              <div className="p-3.5 border-b border-border/40 flex items-center justify-between bg-foreground/5">
+                <div className="flex items-center gap-2">
+                  <GitCommit className="size-4 text-sky-400" />
+                  <span className="text-xs font-semibold text-foreground">Commit History</span>
+                  <span className="text-xs text-foreground/50 font-mono">on branch '{currentBranch}'</span>
+                </div>
+                <span className="text-xs font-mono text-foreground/40">{commits.length} total commits</span>
+              </div>
+
+              {commits.length === 0 ? (
+                <div className="p-8 text-center text-xs font-mono text-foreground/50">
+                  No commit records found for this repository.
+                </div>
+              ) : (
+                <div className="divide-y divide-border/30">
+                  {commits.map((c) => (
+                    <div
+                      key={c.commitSha}
+                      className="p-4 hover:bg-foreground/5 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                    >
+                      <div className="space-y-1.5 flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span
+                            onClick={() => setSelectedCommitSha(c.commitSha)}
+                            className="text-sm font-semibold text-foreground hover:text-emerald-400 transition-colors cursor-pointer"
+                          >
+                            {c.message}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-foreground/50 font-mono flex-wrap">
+                          <span className="inline-flex items-center gap-1 text-foreground/75">
+                            <User className="size-3" />
+                            <span>{c.authorName}</span>
+                          </span>
+                          <span>•</span>
+                          <span className="inline-flex items-center gap-1">
+                            <Clock className="size-3" />
+                            <span>{formatRelativeTime(c.authoredAt || c.pushedAt)}</span>
+                          </span>
+                          {c.parentSha && (
+                            <>
+                              <span>•</span>
+                              <span className="text-[11px] text-foreground/40">
+                                parent {c.parentSha.substring(0, 7)}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => copySha(c.commitSha)}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-border/50 bg-foreground/5 hover:bg-foreground/10 text-xs font-mono text-foreground/80 hover:text-foreground transition-colors"
+                          title="Copy full commit SHA"
+                        >
+                          {copiedSha === c.commitSha ? (
+                            <Check className="size-3 text-emerald-400" />
+                          ) : (
+                            <Copy className="size-3 text-foreground/40" />
+                          )}
+                          <span>{c.commitSha.substring(0, 7)}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setSelectedCommitSha(c.commitSha)}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-xs font-mono text-emerald-400 transition-colors"
+                          title="View commit diff"
+                        >
+                          <span>Diff</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB 3: OPTION A - PULL REQUESTS & BRANCH MERGING */}
+      {activeTab === "pulls" && (
+        <div className="space-y-4">
+          {selectedPrNumber !== null && prDetail ? (
+            /* Single Pull Request Detail View */
+            <div className="space-y-5">
+              <button
+                type="button"
+                onClick={() => setSelectedPrNumber(null)}
+                className="inline-flex items-center gap-1.5 text-xs font-mono text-foreground/60 hover:text-foreground transition-colors"
+              >
+                <ArrowLeft className="size-3.5" />
+                <span>Back to Pull Requests</span>
+              </button>
+
+              {/* PR Header */}
+              <div className="rounded-xl border border-border/50 bg-foreground/5 p-5 space-y-4 shadow-sm">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/30 pb-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <h2 className="text-xl font-bold text-foreground">{prDetail.title}</h2>
+                      <span className="text-lg font-mono text-foreground/40">#{prDetail.number}</span>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-xs text-foreground/60 font-mono flex-wrap">
+                      <span
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                          prDetail.status === "MERGED"
+                            ? "bg-purple-500/15 text-purple-400 border border-purple-500/30"
+                            : "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
+                        }`}
+                      >
+                        {prDetail.status === "MERGED" ? (
                           <>
-                            <span>•</span>
-                            <span className="text-[11px] text-foreground/40">
-                              parent {c.parentSha.substring(0, 7)}
-                            </span>
+                            <GitMerge className="size-3" /> Merged
+                          </>
+                        ) : (
+                          <>
+                            <GitPullRequest className="size-3" /> Open
                           </>
                         )}
-                      </div>
-                    </div>
+                      </span>
 
-                    <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => copySha(c.commitSha)}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-border/50 bg-foreground/5 hover:bg-foreground/10 text-xs font-mono text-foreground/80 hover:text-foreground transition-colors"
-                        title="Copy full commit SHA"
-                      >
-                        {copiedSha === c.commitSha ? (
-                          <Check className="size-3 text-emerald-400" />
-                        ) : (
-                          <Copy className="size-3 text-foreground/40" />
-                        )}
-                        <span>{c.commitSha.substring(0, 7)}</span>
-                      </button>
+                      <span>
+                        <strong className="text-foreground">{prDetail.authorUsername}</strong> wants to merge into{" "}
+                        <code className="bg-foreground/10 px-1.5 py-0.5 rounded text-emerald-400 font-bold">{prDetail.targetBranch}</code> from{" "}
+                        <code className="bg-foreground/10 px-1.5 py-0.5 rounded text-sky-400 font-bold">{prDetail.sourceBranch}</code>
+                      </span>
 
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedCommit(c);
-                          setActiveTab("code");
-                        }}
-                        className="p-1 rounded text-foreground/40 hover:text-foreground hover:bg-foreground/10 transition-colors"
-                        title="View files at this commit"
-                      >
-                        <Code className="size-3.5" />
-                      </button>
+                      <span>•</span>
+                      <span>{formatRelativeTime(prDetail.createdAt)}</span>
                     </div>
                   </div>
-                ))}
+
+                  {/* Merge Action Button */}
+                  {prDetail.status === "OPEN" && (
+                    <div>
+                      <button
+                        type="button"
+                        onClick={handleMergePr}
+                        disabled={prMerging}
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs shadow-sm transition-all disabled:opacity-50"
+                      >
+                        <GitMerge className="size-3.5" />
+                        <span>{prMerging ? "Merging Branch..." : "Merge Pull Request"}</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* PR Description */}
+                {prDetail.description && (
+                  <div className="p-4 rounded-lg bg-foreground/5 border border-border/30 text-xs text-foreground/80 leading-relaxed font-sans">
+                    {renderMarkdownContent(prDetail.description)}
+                  </div>
+                )}
+
+                {/* Summary Metrics */}
+                <div className="flex items-center gap-3 text-xs font-mono text-foreground/60 border-t border-border/20 pt-3">
+                  <span>{prDetail.filesChangedCount || 0} files changed</span>
+                  <span>•</span>
+                  <span className="text-emerald-400 font-semibold">+{prDetail.totalAdditions || 0}</span>
+                  <span className="text-rose-400 font-semibold">-{prDetail.totalDeletions || 0}</span>
+                </div>
               </div>
-            )}
-          </div>
+
+              {/* Discussion & Review Comments */}
+              <div className="rounded-xl border border-border/50 bg-foreground/5 p-5 space-y-4">
+                <div className="flex items-center gap-2 text-xs font-semibold text-foreground font-mono">
+                  <MessageSquare className="size-4 text-purple-400" />
+                  <span>Discussion ({prDetail.comments?.length || 0})</span>
+                </div>
+
+                <div className="space-y-3">
+                  {prDetail.comments && prDetail.comments.length > 0 ? (
+                    prDetail.comments.map((cm) => (
+                      <div key={cm.id} className="p-3 rounded-lg border border-border/30 bg-black/20 space-y-1">
+                        <div className="flex items-center justify-between text-[11px] font-mono text-foreground/50">
+                          <span className="font-semibold text-foreground">{cm.authorUsername}</span>
+                          <span>{formatRelativeTime(cm.createdAt)}</span>
+                        </div>
+                        <p className="text-xs text-foreground/80 font-sans">{cm.commentText}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-xs font-mono text-foreground/40 italic">No comments on this pull request yet.</p>
+                  )}
+                </div>
+
+                {/* Add Comment Box */}
+                <form onSubmit={handleAddComment} className="space-y-2 pt-2 border-t border-border/30">
+                  <textarea
+                    rows={2}
+                    placeholder="Leave a review comment..."
+                    value={prCommentText}
+                    onChange={(e) => setPrCommentText(e.target.value)}
+                    className="w-full bg-foreground/5 border border-border/40 rounded-lg p-2.5 text-xs text-foreground placeholder:text-foreground/30 focus:outline-none focus:border-border"
+                  />
+                  <div className="flex justify-end">
+                    <button
+                      type="submit"
+                      disabled={!prCommentText.trim()}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-foreground/10 hover:bg-foreground/15 text-xs font-semibold text-foreground transition-colors disabled:opacity-40"
+                    >
+                      <Send className="size-3" />
+                      <span>Comment</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              {/* Changed Files Diff */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-foreground font-mono flex items-center gap-2">
+                    <FileText className="size-4 text-emerald-400" />
+                    <span>Files changed</span>
+                  </h3>
+                </div>
+                <DiffViewer files={prDetail.files || []} />
+              </div>
+            </div>
+          ) : isCreatingPr ? (
+            /* Create Pull Request Form */
+            <div className="rounded-xl border border-border/50 bg-foreground/5 p-5 space-y-4 shadow-sm">
+              <div className="flex items-center justify-between border-b border-border/30 pb-3">
+                <div className="flex items-center gap-2">
+                  <GitPullRequest className="size-4 text-emerald-400" />
+                  <h3 className="text-sm font-bold text-foreground">Open a Pull Request</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsCreatingPr(false)}
+                  className="text-xs text-foreground/50 hover:text-foreground font-mono"
+                >
+                  Cancel
+                </button>
+              </div>
+
+              <form onSubmit={handleCreatePr} className="space-y-4">
+                {/* Branch Selection Bar */}
+                <div className="p-3 rounded-lg bg-foreground/5 border border-border/40 flex items-center gap-3 text-xs font-mono">
+                  <span className="text-foreground/60">base:</span>
+                  <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20">
+                    main
+                  </span>
+
+                  <span className="text-foreground/40">⭠</span>
+
+                  <span className="text-foreground/60">compare:</span>
+                  <select
+                    value={newPrSource}
+                    onChange={(e) => setNewPrSource(e.target.value)}
+                    className="bg-foreground/10 border border-border/50 rounded px-2.5 py-1 text-xs text-foreground font-mono outline-none"
+                  >
+                    <option value="">Select source branch</option>
+                    {branches
+                      .filter((b) => b.name !== "main")
+                      .map((b) => (
+                        <option key={b.name} value={b.name}>
+                          {b.name}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-foreground">Title</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. feat: integrate banking ledger updates"
+                    value={newPrTitle}
+                    onChange={(e) => setNewPrTitle(e.target.value)}
+                    className="w-full bg-foreground/5 border border-border/40 rounded-lg p-2.5 text-xs text-foreground placeholder:text-foreground/30 focus:outline-none focus:border-border"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-foreground">Description (Markdown supported)</label>
+                  <textarea
+                    rows={4}
+                    placeholder="Describe the changes made in this branch..."
+                    value={newPrDesc}
+                    onChange={(e) => setNewPrDesc(e.target.value)}
+                    className="w-full bg-foreground/5 border border-border/40 rounded-lg p-2.5 text-xs text-foreground placeholder:text-foreground/30 focus:outline-none focus:border-border font-sans"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsCreatingPr(false)}
+                    className="px-3.5 py-1.5 rounded-lg border border-border/50 text-xs font-mono text-foreground/70 hover:text-foreground"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={prSubmitting || !newPrTitle.trim() || !newPrSource.trim()}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs shadow-sm transition-all disabled:opacity-50"
+                  >
+                    <Plus className="size-3.5" />
+                    <span>{prSubmitting ? "Creating PR..." : "Create Pull Request"}</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          ) : (
+            /* Pull Requests List */
+            <div className="rounded-xl border border-border/50 bg-foreground/5 overflow-hidden shadow-sm space-y-0">
+              <div className="p-3.5 border-b border-border/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-foreground/5">
+                <div className="flex items-center gap-2">
+                  <GitPullRequest className="size-4 text-purple-400" />
+                  <span className="text-xs font-semibold text-foreground">Pull Requests</span>
+
+                  {/* Filter Pills */}
+                  <div className="flex items-center gap-1 ml-3 text-[11px] font-mono">
+                    <button
+                      type="button"
+                      onClick={() => setPrStatusFilter("ALL")}
+                      className={`px-2 py-0.5 rounded transition-colors ${
+                        prStatusFilter === "ALL" ? "bg-foreground/15 text-foreground font-bold" : "text-foreground/50 hover:text-foreground"
+                      }`}
+                    >
+                      All
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPrStatusFilter("OPEN")}
+                      className={`px-2 py-0.5 rounded transition-colors ${
+                        prStatusFilter === "OPEN" ? "bg-foreground/15 text-emerald-400 font-bold" : "text-foreground/50 hover:text-foreground"
+                      }`}
+                    >
+                      Open
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPrStatusFilter("MERGED")}
+                      className={`px-2 py-0.5 rounded transition-colors ${
+                        prStatusFilter === "MERGED" ? "bg-foreground/15 text-purple-400 font-bold" : "text-foreground/50 hover:text-foreground"
+                      }`}
+                    >
+                      Merged
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsCreatingPr(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-xs transition-all self-start sm:self-auto"
+                >
+                  <Plus className="size-3" />
+                  <span>New pull request</span>
+                </button>
+              </div>
+
+              {loadingPulls ? (
+                <div className="p-8 text-center text-xs font-mono text-foreground/50">
+                  Loading pull requests from Neon DB...
+                </div>
+              ) : pullRequests.length === 0 ? (
+                <div className="p-10 text-center space-y-2">
+                  <GitPullRequest className="size-8 text-foreground/20 mx-auto" />
+                  <p className="text-xs font-mono text-foreground/60">No pull requests match this filter.</p>
+                  <p className="text-[11px] text-foreground/40 font-sans">
+                    Create a branch, push changes, and open a pull request to review code and merge.
+                  </p>
+                </div>
+              ) : (
+                <div className="divide-y divide-border/30">
+                  {pullRequests.map((pr) => (
+                    <div
+                      key={pr.id}
+                      onClick={() => setSelectedPrNumber(pr.number)}
+                      className="p-4 hover:bg-foreground/5 transition-colors flex items-start justify-between gap-3 cursor-pointer group"
+                    >
+                      <div className="flex items-start gap-3 min-w-0">
+                        {pr.status === "MERGED" ? (
+                          <GitMerge className="size-4 text-purple-400 shrink-0 mt-0.5" />
+                        ) : (
+                          <GitPullRequest className="size-4 text-emerald-400 shrink-0 mt-0.5" />
+                        )}
+
+                        <div className="space-y-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-semibold text-sm text-foreground group-hover:text-emerald-400 transition-colors">
+                              {pr.title}
+                            </span>
+                            <span className="text-xs font-mono text-foreground/40">#{pr.number}</span>
+                          </div>
+
+                          <div className="flex items-center gap-2 text-xs text-foreground/50 font-mono flex-wrap">
+                            <span>
+                              by <strong className="text-foreground/75">{pr.authorUsername}</strong>
+                            </span>
+                            <span>•</span>
+                            <span className="text-emerald-400/90">{pr.targetBranch}</span>
+                            <span>⭠</span>
+                            <span className="text-sky-400/90">{pr.sourceBranch}</span>
+                            <span>•</span>
+                            <span>{formatRelativeTime(pr.createdAt)}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <span
+                        className={`text-[10px] px-2 py-0.5 rounded font-mono font-semibold shrink-0 uppercase border ${
+                          pr.status === "MERGED"
+                            ? "bg-purple-500/10 text-purple-400 border-purple-500/20"
+                            : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                        }`}
+                      >
+                        {pr.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
