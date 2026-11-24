@@ -35,6 +35,8 @@ import {
   Globe,
   Bell,
   Search,
+  Sun,
+  Moon,
   Sparkles,
   RefreshCw,
   FolderPlus,
@@ -87,6 +89,32 @@ export function DashboardPage({
     setCopiedCmd(text);
     showToast("Copied to clipboard!");
     setTimeout(() => setCopiedCmd(null), 2000);
+  };
+
+  // Theme state: dark / light
+  const [isDark, setIsDark] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("mygit-theme");
+      if (saved) return saved === "dark";
+      return document.documentElement.classList.contains("dark");
+    }
+    return true;
+  });
+
+  const toggleTheme = () => {
+    const nextDark = !isDark;
+    setIsDark(nextDark);
+    if (typeof window !== "undefined") {
+      if (nextDark) {
+        document.documentElement.classList.add("dark");
+        document.documentElement.style.colorScheme = "dark";
+        localStorage.setItem("mygit-theme", "dark");
+      } else {
+        document.documentElement.classList.remove("dark");
+        document.documentElement.style.colorScheme = "light";
+        localStorage.setItem("mygit-theme", "light");
+      }
+    }
   };
 
   // -------------------------------------------------------------
@@ -2065,7 +2093,7 @@ export function DashboardPage({
               <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
                 <form
                   onSubmit={handleGenerateToken}
-                  className="max-w-md w-full p-6 rounded-2xl border border-border/50 bg-[#070b10] space-y-4 shadow-2xl"
+                  className="max-w-md w-full p-6 rounded-2xl border border-border/50 bg-card space-y-4 shadow-2xl"
                 >
                   <div className="flex items-center justify-between border-b border-border/40 pb-3">
                     <h3 className="font-bold text-sm text-foreground">Generate New Access Token</h3>
@@ -2221,7 +2249,7 @@ export function DashboardPage({
               <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
                 <form
                   onSubmit={handleAddSshKey}
-                  className="max-w-lg w-full p-6 rounded-2xl border border-border/50 bg-[#070b10] space-y-4 shadow-2xl"
+                  className="max-w-lg w-full p-6 rounded-2xl border border-border/50 bg-card space-y-4 shadow-2xl"
                 >
                   <div className="flex items-center justify-between border-b border-border/40 pb-3">
                     <h3 className="font-bold text-sm text-foreground">Add new SSH Key</h3>
@@ -2927,7 +2955,15 @@ export function DashboardPage({
 
           <Sidebar001Footer>
             <div className="flex items-center justify-between text-xs text-foreground/40">
-              <span>v1.0.0</span>
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className="flex items-center gap-1.5 text-foreground/50 hover:text-foreground transition-colors font-mono"
+                title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+              >
+                {isDark ? <Sun className="size-3 text-amber-400" /> : <Moon className="size-3 text-sky-500" />}
+                <span>{isDark ? "Light" : "Dark"}</span>
+              </button>
               <button
                 type="button"
                 onClick={() => {
@@ -2975,6 +3011,27 @@ export function DashboardPage({
                 <span className="hidden sm:inline">Landing Page</span>
               </button>
             )}
+
+            {/* Light / Dark Mode Toggle Button */}
+            <button
+              type="button"
+              onClick={toggleTheme}
+              title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+              aria-label="Toggle theme"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-border/60 hover:border-border bg-foreground/5 hover:bg-foreground/10 text-xs text-foreground/80 font-medium transition-all cursor-pointer"
+            >
+              {isDark ? (
+                <>
+                  <Sun className="size-3.5 text-amber-400" />
+                  <span className="hidden sm:inline font-mono">Light</span>
+                </>
+              ) : (
+                <>
+                  <Moon className="size-3.5 text-sky-500" />
+                  <span className="hidden sm:inline font-mono">Dark</span>
+                </>
+              )}
+            </button>
 
             <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-md border border-border/50 bg-foreground/5 text-xs text-foreground/50 w-52">
               <Search className="size-3.5" />
