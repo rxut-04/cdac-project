@@ -4,6 +4,7 @@ import * as React from "react";
 import { useState, useMemo, useEffect } from "react";
 import { repoApi, authApi } from "@/lib/api";
 import { RepoFileExplorer } from "@/components/ui/repo-file-explorer";
+import { ContributionHeatmap } from "@/components/ui/contribution-heatmap";
 import {
   Sidebar001,
   Sidebar001Content,
@@ -2419,58 +2420,11 @@ export function DashboardPage({
               </div>
             </div>
 
-            {/* Contribution heatmap card */}
-            <div className="p-6 rounded-lg border border-border/50 bg-foreground/5 space-y-5">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                    <Sparkles className="size-4 text-accent-pro" />
-                    Continuous Contribution Ledger
-                  </h2>
-                  <p className="text-xs text-foreground/45 mt-0.5 font-mono">
-                    348 verified byte-compatible commits this year
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setActive("/new")}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-foreground/10 text-foreground hover:bg-foreground/15 border border-border/50 transition-all self-start sm:self-auto"
-                >
-                  <Plus className="size-3.5" />
-                  <span>Create New Repository</span>
-                </button>
-              </div>
-
-              {/* Heatmap Grid */}
-              <div className="overflow-x-auto pb-1 no-scrollbar">
-                <div className="inline-flex flex-col gap-1.5 min-w-[620px]">
-                  <div className="grid grid-flow-col grid-rows-7 gap-1">
-                    {heatmapData.flatMap((week, wi) =>
-                      week.map((level, di) => (
-                        <div
-                          key={`${wi}-${di}`}
-                          className={`size-3 rounded-sm border transition-transform hover:scale-125 cursor-pointer ${heatMapColors[level]}`}
-                          title={`Week ${wi + 1}, Day ${di + 1}: ${level * 3} commits`}
-                        />
-                      ))
-                    )}
-                  </div>
-                  <div className="flex items-center justify-between text-[11px] text-foreground/40 pt-1 font-mono">
-                    <span>Jan</span>
-                    <span>Apr</span>
-                    <span>Jul</span>
-                    <span>Oct</span>
-                    <div className="flex items-center gap-1.5 ml-auto">
-                      <span>Less</span>
-                      {heatMapColors.map((cls, idx) => (
-                        <span key={idx} className={`size-2.5 rounded-sm border ${cls}`} />
-                      ))}
-                      <span>More</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            {/* Live Contribution Heatmap */}
+            <ContributionHeatmap
+              username={username}
+              onCreateRepo={() => setActive("/new")}
+            />
 
             {/* Footer tip line */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-foreground/45 font-mono pt-1">

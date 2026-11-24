@@ -114,6 +114,29 @@ interface BranchItem {
   isDefault: boolean;
 }
 
+interface IssueItem {
+  id: number;
+  number: number;
+  title: string;
+  description?: string;
+  status: "OPEN" | "CLOSED" | string;
+  labels: string[];
+  authorUsername: string;
+  createdAt: string;
+  updatedAt: string;
+  closedAt?: string;
+  closedByUsername?: string;
+}
+
+interface IssueDetail extends IssueItem {
+  comments?: Array<{
+    id: number;
+    authorUsername: string;
+    commentText: string;
+    createdAt: string;
+  }>;
+}
+
 // Fallback initial files
 function getInitialFilesForRepo(repoName: string, owner: string): RepoFile[] {
   return [
@@ -350,8 +373,8 @@ export function RepoFileExplorer({
   const [selectedPath, setSelectedPath] = useState<string>("README.md");
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Navigation Tabs: "code" | "commits" | "pulls"
-  const [activeTab, setActiveTab] = useState<"code" | "commits" | "pulls">("code");
+  // Navigation Tabs: "code" | "commits" | "pulls" | "issues"
+  const [activeTab, setActiveTab] = useState<"code" | "commits" | "pulls" | "issues">("code");
 
   // Branches
   const [branches, setBranches] = useState<BranchItem[]>([{ name: "main", isDefault: true }]);
@@ -380,6 +403,21 @@ export function RepoFileExplorer({
   const [prCommentText, setPrCommentText] = useState("");
   const [prMerging, setPrMerging] = useState(false);
   const [prStatusFilter, setPrStatusFilter] = useState<"ALL" | "OPEN" | "MERGED">("ALL");
+
+  // Issues & Bug Reports
+  const [issues, setIssues] = useState<IssueItem[]>([]);
+  const [loadingIssues, setLoadingIssues] = useState(false);
+  const [selectedIssueNumber, setSelectedIssueNumber] = useState<number | null>(null);
+  const [issueDetail, setIssueDetail] = useState<IssueDetail | null>(null);
+  const [loadingIssueDetail, setLoadingIssueDetail] = useState(false);
+  const [isCreatingIssue, setIsCreatingIssue] = useState(false);
+  const [newIssueTitle, setNewIssueTitle] = useState("");
+  const [newIssueDesc, setNewIssueDesc] = useState("");
+  const [newIssueLabels, setNewIssueLabels] = useState<string[]>([]);
+  const [issueSubmitting, setIssueSubmitting] = useState(false);
+  const [issueCommentText, setIssueCommentText] = useState("");
+  const [issueStatusFilter, setIssueStatusFilter] = useState<"ALL" | "OPEN" | "CLOSED">("ALL");
+  const [updatingIssueStatus, setUpdatingIssueStatus] = useState(false);
 
   // Code ▾ dropdown
   const [codeDropdownOpen, setCodeDropdownOpen] = useState(false);
@@ -546,6 +584,112 @@ export function RepoFileExplorer({
       .then(() => {
         setPrCommentText("");
         loadPrDetail(selectedPrNumber);
+      })
+      .catch((err) => {
+        alert(err.response?.data?.error || "Failed to post comment");
+      });
+  };
+
+  // Fetch Issues
+  const fetchIssues = () => {
+    setLoadingIssues(true);
+    api.get(`/repos/${encodeURIComponent(repoName)}/issues?status=${issueStatusFilter}`)
+      .then((res) => {
+        if (Array.isArray(res.data)) {
+          setIssues(res.data);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoadingIssues(false));
+  };
+
+  useEffect(() => {
+    fetchIssues();
+  }, [repoName, issueStatusFilter]);
+
+  // Fetch issue detail when an issue is selected
+  const loadIssueDetail = (num: number) => {
+    setLoadingIssueDetail(true);
+    api.get(`/repos/${encodeURIComponent(repoName)}/issues/${num}`)
+      .then((res) => {
+        if (res.data) setIssueDetail(res.data);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingIssueDetail(false));
+  };
+
+  useEffect(() => {
+    if (selectedIssueNumber !== null) {
+      loadIssueDetail(selectedIssueNumber);
+    } else {
+      setIssueDetail(null);
+    }
+  }, [repoName, selectedIssueNumber]);
+
+  // Create Issue
+  const handleCreateIssue = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newIssueTitle.trim()) return;
+
+    setIssueSubmitting(true);
+    api.post(`/repos/${encodeURIComponent(repoName)}/issues`, {
+      title: newIssueTitle.trim(),
+      description: newIssueDesc.trim(),
+      labels: newIssueLabels.join(","),
+    })
+      .then((res) => {
+        setIsCreatingIssue(false);
+        setNewIssueTitle("");
+        setNewIssueDesc("");
+        setNewIssueLabels([]);
+        fetchIssues();
+        if (res.data?.number) {
+          setSelectedIssueNumber(res.data.number);
+        }
+      })
+      .catch((err) => {
+        alert(err.response?.data?.error || "Failed to create issue");
+      })
+      .finally(() => setIssueSubmitting(false));
+  };
+
+  // Toggle Issue Status (Open <-> Closed)
+  const handleToggleIssueStatus = () => {
+    if (!selectedIssueNumber || !issueDetail) return;
+    setUpdatingIssueStatus(true);
+    const nextStatus = issueDetail.status === "OPEN" ? "CLOSED" : "OPEN";
+
+    api.patch(`/repos/${encodeURIComponent(repoName)}/issues/${selectedIssueNumber}/status`, {
+      status: nextStatus,
+    })
+      .then((res) => {
+        if (res.data) {
+          setIssueDetail((prev) => prev ? { ...prev, status: res.data.status, closedAt: res.data.closedAt, closedByUsername: res.data.closedByUsername } : null);
+          fetchIssues();
+        }
+      })
+      .catch((err) => {
+        alert(err.response?.data?.error || "Failed to update issue status");
+      })
+      .finally(() => setUpdatingIssueStatus(false));
+  };
+
+  // Submit Issue Comment
+  const handleAddIssueComment = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedIssueNumber || !issueCommentText.trim()) return;
+
+    api.post(`/repos/${encodeURIComponent(repoName)}/issues/${selectedIssueNumber}/comments`, {
+      commentText: issueCommentText.trim(),
+    })
+      .then((res) => {
+        if (res.data && issueDetail) {
+          setIssueDetail({
+            ...issueDetail,
+            comments: [...(issueDetail.comments || []), res.data],
+          });
+          setIssueCommentText("");
+        }
       })
       .catch((err) => {
         alert(err.response?.data?.error || "Failed to post comment");
@@ -727,6 +871,10 @@ export function RepoFileExplorer({
               <GitPullRequest className="size-3 text-purple-400" />
               <span>{pullRequests.length} PRs</span>
             </span>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-foreground/5 border border-border/40 text-foreground/75">
+              <AlertCircle className="size-3 text-amber-400" />
+              <span>{issues.length} Issues</span>
+            </span>
           </div>
         </div>
 
@@ -828,6 +976,7 @@ export function RepoFileExplorer({
               onClick={() => {
                 setActiveTab("pulls");
                 setSelectedCommitSha(null);
+                setSelectedIssueNumber(null);
               }}
               className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs font-medium transition-all ${
                 activeTab === "pulls"
@@ -839,6 +988,26 @@ export function RepoFileExplorer({
               <span>Pull Requests</span>
               <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-foreground/10 text-foreground/70">
                 {pullRequests.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab("issues");
+                setSelectedCommitSha(null);
+                setSelectedPrNumber(null);
+              }}
+              className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs font-medium transition-all ${
+                activeTab === "issues"
+                  ? "bg-foreground/15 text-foreground shadow-xs font-semibold"
+                  : "text-foreground/60 hover:text-foreground"
+              }`}
+            >
+              <AlertCircle className="size-3.5 text-amber-400" />
+              <span>Issues</span>
+              <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-foreground/10 text-foreground/70">
+                {issues.length}
               </span>
             </button>
           </div>
@@ -1401,6 +1570,389 @@ export function RepoFileExplorer({
                         }`}
                       >
                         {pr.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB 4: ISSUES TRACKER & BUG REPORTS */}
+      {activeTab === "issues" && (
+        <div className="space-y-4">
+          {selectedIssueNumber !== null && issueDetail ? (
+            /* Single Issue Detail View */
+            <div className="space-y-5">
+              <button
+                type="button"
+                onClick={() => setSelectedIssueNumber(null)}
+                className="inline-flex items-center gap-1.5 text-xs font-mono text-foreground/60 hover:text-foreground transition-colors"
+              >
+                <ArrowLeft className="size-3.5" />
+                <span>Back to Issues</span>
+              </button>
+
+              {/* Issue Header */}
+              <div className="rounded-xl border border-border/50 bg-foreground/5 p-5 space-y-4 shadow-sm">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/30 pb-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <h2 className="text-xl font-bold text-foreground">{issueDetail.title}</h2>
+                      <span className="text-lg font-mono text-foreground/40">#{issueDetail.number}</span>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-xs text-foreground/60 font-mono flex-wrap">
+                      <span
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                          issueDetail.status === "CLOSED"
+                            ? "bg-purple-500/15 text-purple-400 border border-purple-500/30"
+                            : "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
+                        }`}
+                      >
+                        {issueDetail.status === "CLOSED" ? (
+                          <>
+                            <CheckCircle2 className="size-3" /> Closed
+                          </>
+                        ) : (
+                          <>
+                            <AlertCircle className="size-3" /> Open
+                          </>
+                        )}
+                      </span>
+
+                      <span>
+                        <strong className="text-foreground">{issueDetail.authorUsername}</strong> opened this issue{" "}
+                        {formatRelativeTime(issueDetail.createdAt)}
+                      </span>
+
+                      {issueDetail.closedAt && (
+                        <>
+                          <span>•</span>
+                          <span className="text-purple-400/80">
+                            closed by {issueDetail.closedByUsername || "author"} {formatRelativeTime(issueDetail.closedAt)}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Toggle Status Action Button */}
+                  <button
+                    type="button"
+                    onClick={handleToggleIssueStatus}
+                    disabled={updatingIssueStatus}
+                    className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold shadow-xs transition-all self-start sm:self-auto disabled:opacity-50 ${
+                      issueDetail.status === "OPEN"
+                        ? "bg-foreground/10 hover:bg-foreground/20 text-foreground border border-border/50"
+                        : "bg-emerald-600 hover:bg-emerald-500 text-white"
+                    }`}
+                  >
+                    {issueDetail.status === "OPEN" ? (
+                      <>
+                        <CheckCircle2 className="size-3.5 text-purple-400" />
+                        <span>{updatingIssueStatus ? "Closing..." : "Close issue"}</span>
+                      </>
+                    ) : (
+                      <>
+                        <AlertCircle className="size-3.5 text-white" />
+                        <span>{updatingIssueStatus ? "Reopening..." : "Reopen issue"}</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* Issue Description & Labels */}
+                <div className="space-y-3">
+                  <div className="text-xs text-foreground/80 leading-relaxed font-sans bg-foreground/5 p-4 rounded-lg border border-border/30 whitespace-pre-wrap">
+                    {issueDetail.description || "No description provided."}
+                  </div>
+
+                  {issueDetail.labels && issueDetail.labels.length > 0 && (
+                    <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                      <span className="text-[11px] font-mono text-foreground/40">Labels:</span>
+                      {issueDetail.labels.map((lbl, idx) => (
+                        <span
+                          key={idx}
+                          className="px-2 py-0.5 rounded-full text-[10px] font-mono font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                        >
+                          {lbl}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Discussion Thread */}
+              <div className="rounded-xl border border-border/50 bg-foreground/5 p-5 space-y-4 shadow-sm">
+                <h3 className="text-xs font-semibold font-mono text-foreground/70 flex items-center gap-2">
+                  <MessageSquare className="size-3.5 text-amber-400" />
+                  <span>Discussion ({issueDetail.comments?.length || 0})</span>
+                </h3>
+
+                <div className="space-y-3">
+                  {(!issueDetail.comments || issueDetail.comments.length === 0) ? (
+                    <p className="text-xs font-mono text-foreground/40 py-2">
+                      No comments on this issue yet. Join the discussion below.
+                    </p>
+                  ) : (
+                    issueDetail.comments.map((comment) => (
+                      <div
+                        key={comment.id}
+                        className="rounded-lg border border-border/40 bg-foreground/5 p-3.5 space-y-2"
+                      >
+                        <div className="flex items-center justify-between text-xs text-foreground/50 font-mono border-b border-border/20 pb-2">
+                          <span className="flex items-center gap-1.5 font-semibold text-foreground/90">
+                            <User className="size-3 text-amber-400" />
+                            {comment.authorUsername}
+                          </span>
+                          <span>{formatRelativeTime(comment.createdAt)}</span>
+                        </div>
+                        <p className="text-xs text-foreground/80 font-sans leading-relaxed whitespace-pre-wrap">
+                          {comment.commentText}
+                        </p>
+                      </div>
+                    ))
+                  )}
+
+                  {/* Add Comment Form */}
+                  <form onSubmit={handleAddIssueComment} className="pt-2 space-y-2">
+                    <textarea
+                      rows={3}
+                      placeholder="Leave a comment on this issue..."
+                      value={issueCommentText}
+                      onChange={(e) => setIssueCommentText(e.target.value)}
+                      className="w-full p-3 rounded-lg border border-border/50 bg-foreground/5 text-xs text-foreground outline-none focus:border-amber-500/50 transition-colors font-sans"
+                    />
+                    <div className="flex justify-end">
+                      <button
+                        type="submit"
+                        disabled={!issueCommentText.trim()}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-foreground/10 hover:bg-foreground/15 border border-border/50 text-xs font-semibold text-foreground transition-all disabled:opacity-40"
+                      >
+                        <Send className="size-3" />
+                        <span>Comment</span>
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+          ) : isCreatingIssue ? (
+            /* New Issue Form */
+            <div className="rounded-xl border border-border/50 bg-foreground/5 p-6 space-y-5 shadow-sm">
+              <div className="flex items-center justify-between border-b border-border/30 pb-3">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="size-4 text-amber-400" />
+                  <h3 className="text-sm font-semibold text-foreground">Create a new Issue</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsCreatingIssue(false)}
+                  className="text-xs font-mono text-foreground/50 hover:text-foreground"
+                >
+                  Cancel
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateIssue} className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-mono text-foreground/70">Issue Title *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Audit token expiration in AuthService.java"
+                    value={newIssueTitle}
+                    onChange={(e) => setNewIssueTitle(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-border/50 bg-foreground/5 text-xs text-foreground outline-none focus:border-amber-500/60 font-sans"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-mono text-foreground/70">Description / Reproduction Steps</label>
+                  <textarea
+                    rows={4}
+                    placeholder="Describe what happened, expected behavior, or tasks needed..."
+                    value={newIssueDesc}
+                    onChange={(e) => setNewIssueDesc(e.target.value)}
+                    className="w-full p-3 rounded-lg border border-border/50 bg-foreground/5 text-xs text-foreground outline-none focus:border-amber-500/60 font-sans"
+                  />
+                </div>
+
+                {/* Preset Labels */}
+                <div className="space-y-2">
+                  <label className="text-xs font-mono text-foreground/70">Add Labels</label>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {["bug", "enhancement", "security", "documentation", "performance", "help-wanted"].map((label) => {
+                      const isSelected = newIssueLabels.includes(label);
+                      return (
+                        <button
+                          key={label}
+                          type="button"
+                          onClick={() => {
+                            if (isSelected) {
+                              setNewIssueLabels(newIssueLabels.filter((l) => l !== label));
+                            } else {
+                              setNewIssueLabels([...newIssueLabels, label]);
+                            }
+                          }}
+                          className={`px-2.5 py-1 rounded-full text-xs font-mono transition-all ${
+                            isSelected
+                              ? "bg-amber-500/20 text-amber-300 border border-amber-500/40 font-semibold"
+                              : "bg-foreground/5 text-foreground/50 hover:text-foreground border border-border/40"
+                          }`}
+                        >
+                          {isSelected ? `✓ ${label}` : `+ ${label}`}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-border/30">
+                  <button
+                    type="button"
+                    onClick={() => setIsCreatingIssue(false)}
+                    className="px-3.5 py-1.5 rounded-lg border border-border/50 text-xs font-mono text-foreground/70 hover:text-foreground"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={issueSubmitting || !newIssueTitle.trim()}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-semibold text-xs shadow-sm transition-all disabled:opacity-50"
+                  >
+                    <Plus className="size-3.5" />
+                    <span>{issueSubmitting ? "Submitting..." : "Submit new issue"}</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          ) : (
+            /* Issues List View */
+            <div className="rounded-xl border border-border/50 bg-foreground/5 overflow-hidden shadow-sm space-y-0">
+              <div className="p-3.5 border-b border-border/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-foreground/5">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="size-4 text-amber-400" />
+                  <span className="text-xs font-semibold text-foreground">Issues</span>
+
+                  {/* Filter Pills */}
+                  <div className="flex items-center gap-1 ml-3 text-[11px] font-mono">
+                    <button
+                      type="button"
+                      onClick={() => setIssueStatusFilter("ALL")}
+                      className={`px-2 py-0.5 rounded transition-colors ${
+                        issueStatusFilter === "ALL" ? "bg-foreground/15 text-foreground font-bold" : "text-foreground/50 hover:text-foreground"
+                      }`}
+                    >
+                      All
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIssueStatusFilter("OPEN")}
+                      className={`px-2 py-0.5 rounded transition-colors ${
+                        issueStatusFilter === "OPEN" ? "bg-foreground/15 text-emerald-400 font-bold" : "text-foreground/50 hover:text-foreground"
+                      }`}
+                    >
+                      Open
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIssueStatusFilter("CLOSED")}
+                      className={`px-2 py-0.5 rounded transition-colors ${
+                        issueStatusFilter === "CLOSED" ? "bg-foreground/15 text-purple-400 font-bold" : "text-foreground/50 hover:text-foreground"
+                      }`}
+                    >
+                      Closed
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsCreatingIssue(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold shadow-xs transition-all self-start sm:self-auto"
+                >
+                  <Plus className="size-3" />
+                  <span>New issue</span>
+                </button>
+              </div>
+
+              {loadingIssues ? (
+                <div className="p-8 text-center text-xs font-mono text-foreground/50">
+                  Loading issues from Neon DB...
+                </div>
+              ) : issues.length === 0 ? (
+                <div className="p-10 text-center space-y-2">
+                  <AlertCircle className="size-8 text-foreground/20 mx-auto" />
+                  <p className="text-xs font-mono text-foreground/60">No issues match this filter.</p>
+                  <p className="text-[11px] text-foreground/40 font-sans">
+                    Track bugs, tasks, and feature proposals for this repository.
+                  </p>
+                </div>
+              ) : (
+                <div className="divide-y divide-border/30">
+                  {issues.map((i) => (
+                    <div
+                      key={i.id}
+                      onClick={() => setSelectedIssueNumber(i.number)}
+                      className="p-4 hover:bg-foreground/5 transition-colors flex items-start justify-between gap-3 cursor-pointer group"
+                    >
+                      <div className="flex items-start gap-3 min-w-0">
+                        {i.status === "CLOSED" ? (
+                          <CheckCircle2 className="size-4 text-purple-400 shrink-0 mt-0.5" />
+                        ) : (
+                          <AlertCircle className="size-4 text-emerald-400 shrink-0 mt-0.5" />
+                        )}
+
+                        <div className="space-y-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-semibold text-sm text-foreground group-hover:text-amber-400 transition-colors">
+                              {i.title}
+                            </span>
+                            <span className="text-xs font-mono text-foreground/40">#{i.number}</span>
+
+                            {i.labels && i.labels.length > 0 && (
+                              <div className="flex items-center gap-1 ml-1">
+                                {i.labels.map((lbl, idx) => (
+                                  <span
+                                    key={idx}
+                                    className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                                  >
+                                    {lbl}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-2 text-xs text-foreground/50 font-mono flex-wrap">
+                            <span>
+                              opened by <strong className="text-foreground/75">{i.authorUsername}</strong>
+                            </span>
+                            <span>•</span>
+                            <span>{formatRelativeTime(i.createdAt)}</span>
+                            {i.closedAt && (
+                              <>
+                                <span>•</span>
+                                <span className="text-purple-400/80">closed {formatRelativeTime(i.closedAt)}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <span
+                        className={`text-[10px] px-2 py-0.5 rounded font-mono font-semibold shrink-0 uppercase border ${
+                          i.status === "CLOSED"
+                            ? "bg-purple-500/10 text-purple-400 border-purple-500/20"
+                            : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                        }`}
+                      >
+                        {i.status}
                       </span>
                     </div>
                   ))}
