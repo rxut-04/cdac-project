@@ -75,9 +75,12 @@ export function DashboardPage({
   const [copiedCmd, setCopiedCmd] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [cliModalOpen, setCliModalOpen] = useState(false);
 
   const storedUser = authApi.getStoredUser();
   const username = storedUser?.username || userEmail.split("@")[0] || "user";
+  const activeToken = typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
+  const cliLoginCmd = activeToken ? `mygit login --token ${activeToken}` : `mygit login --email ${userEmail}`;
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -988,14 +991,14 @@ export function DashboardPage({
           {
             num: 4,
             title: "Log in from the terminal",
-            desc: "Configure your CLI session to talk to mygit's edge network.",
-            cmd: `mygit auth login --email ${userEmail}`,
+            desc: "Authenticate your terminal tool. Works for both Google SSO and Email users.",
+            cmd: cliLoginCmd,
           },
           {
             num: 5,
-            title: "Push your first commit",
-            desc: "Set your remote URL and push your local main branch.",
-            cmd: `git remote add mygit mygit://mygit.dev/${username}/my-project.git && git push mygit main`,
+            title: "Create repository & push code",
+            desc: "Create your cloud repository first, then push your local branch.",
+            cmd: `mygit repo create my-project && mygit push origin main`,
           },
         ];
 
@@ -2698,9 +2701,10 @@ export function DashboardPage({
 
                 <div className="space-y-2">
                   {[
-                    { label: "Authenticate CLI", cmd: "mygit auth login --email " + userEmail },
-                    { label: "Clone repository", cmd: "mygit clone mygit://mygit.dev/" + username + "/mygit-kernel.git" },
-                    { label: "Add remote & push", cmd: "git remote add mygit mygit://mygit.dev/" + username + "/mygit-kernel.git && git push mygit main" },
+                    { label: "Authenticate CLI (Google/Email)", cmd: cliLoginCmd },
+                    { label: "Create Cloud Repository", cmd: "mygit repo create my-project" },
+                    { label: "Clone repository", cmd: "mygit clone https://mygit-backend-y27o.onrender.com/api/repos/" + username + "/mygit-kernel" },
+                    { label: "Push code", cmd: "mygit push origin main" },
                   ].map((item) => (
                     <div key={item.label} className="p-2.5 rounded border border-border/40 bg-background/80 space-y-1">
                       <div className="flex items-center justify-between text-[10px] text-foreground/40 font-mono">
@@ -2744,6 +2748,98 @@ export function DashboardPage({
         <div className="fixed bottom-5 right-5 z-50 px-4 py-2.5 rounded-lg border border-border bg-card text-xs font-mono text-foreground shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2">
           <CheckCircle2 className="size-4 text-emerald-400" />
           <span>{toastMessage}</span>
+        </div>
+      )}
+
+      {/* CLI Token & Login Modal */}
+      {cliModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150"
+          onClick={() => setCliModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-lg rounded-2xl border border-border/80 bg-card text-card-foreground shadow-2xl p-6 space-y-5 animate-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-500 dark:text-emerald-400">
+                  <Terminal className="size-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+                    CLI Authentication
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-500 dark:text-emerald-400 border border-emerald-500/30">
+                      Google SSO & Web
+                    </span>
+                  </h3>
+                  <p className="text-xs text-foreground/60 font-mono mt-0.5">
+                    Connect your client terminal to your mygit account
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCliModalOpen(false)}
+                className="p-1 rounded-lg text-foreground/50 hover:text-foreground hover:bg-foreground/5 transition-colors cursor-pointer"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs font-mono">
+                <span className="text-foreground/70 font-semibold">1-Click Terminal Login Command:</span>
+                <span className="text-[11px] text-foreground/50">Auto-persists in ~/.mygit/credentials</span>
+              </div>
+              <div className="flex items-center gap-2 p-2.5 rounded-xl bg-foreground/5 border border-border/70 font-mono text-xs">
+                <span className="text-foreground/40 select-none">$</span>
+                <input
+                  type="text"
+                  readOnly
+                  value={cliLoginCmd}
+                  className="bg-transparent flex-1 truncate text-foreground font-mono text-xs outline-none select-all"
+                />
+                <button
+                  type="button"
+                  onClick={() => copyToClipboard(cliLoginCmd)}
+                  className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium flex items-center gap-1.5 transition-colors text-xs shrink-0 cursor-pointer"
+                >
+                  <Copy className="size-3.5" />
+                  <span>Copy</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Rules for Client Operations */}
+            <div className="rounded-xl border border-border/60 bg-foreground/[0.02] p-3.5 space-y-2 text-xs">
+              <div className="font-semibold text-foreground/90 flex items-center gap-1.5 text-xs">
+                <Shield className="size-3.5 text-amber-500" />
+                Important Client Operation Rules:
+              </div>
+              <ul className="space-y-1.5 text-foreground/70 text-[11px] list-disc list-inside">
+                <li>
+                  <strong className="text-foreground">Persistent Login:</strong> You only run this login command once per laptop. Credentials remain stored permanently across all repos and reboots.
+                </li>
+                <li>
+                  <strong className="text-foreground">Repo Must Exist First:</strong> The cloud rejects pushes to non-existent repos. Always run <code className="bg-foreground/10 px-1 py-0.5 rounded font-mono text-emerald-500">mygit repo create &lt;name&gt;</code> before pushing.
+                </li>
+                <li>
+                  <strong className="text-foreground">Check Active User:</strong> Run <code className="bg-foreground/10 px-1 py-0.5 rounded font-mono text-foreground/90">mygit whoami</code> in any directory to inspect your authenticated identity.
+                </li>
+              </ul>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => setCliModalOpen(false)}
+                className="px-4 py-2 rounded-lg bg-foreground/10 hover:bg-foreground/15 text-foreground text-xs font-medium transition-colors cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -3056,6 +3152,18 @@ export function DashboardPage({
                 <span className="hidden sm:inline">Landing Page</span>
               </button>
             )}
+
+            {/* CLI Access & Token Modal Button */}
+            <button
+              type="button"
+              onClick={() => setCliModalOpen(true)}
+              title="Copy CLI Login Command & Terminal Access"
+              aria-label="CLI Token"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-emerald-500/30 hover:border-emerald-500/60 bg-emerald-500/10 hover:bg-emerald-500/20 text-xs text-emerald-600 dark:text-emerald-400 font-medium transition-all cursor-pointer shadow-xs"
+            >
+              <Terminal className="size-3.5" />
+              <span className="hidden sm:inline font-mono">CLI Token</span>
+            </button>
 
             {/* Light / Dark Mode Toggle Button */}
             <button
