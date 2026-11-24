@@ -7,6 +7,17 @@ import { AntiMetalButton } from "@/components/ui/anti-metal-button";
 import CompareUILib, { type ComparisonData } from "@/components/ui/shadcn-studio-compare-07";
 import WordmarkFooter from "@/components/ui/wordmark-footer";
 import { InstallSection } from "@/components/ui/install-section";
+import { buttonVariants } from "@/components/ui/button";
+import {
+  NavigationMenu,
+  NavigationMenuItem,
+  NavigationMenuLink,
+  NavigationMenuList,
+} from "@/components/ui/navigation-menu";
+import { MobileNav } from "@/components/ui/navbar";
+import { LiquidGlassLogo, type LiquidGlassLogoHandle } from "@/components/liquid-glass-logo";
+import { LiquidGlassOrb, type LiquidGlassOrbState } from "@/components/liquid-glass-orb";
+import { cn } from "@/lib/utils";
 
 const mygitComparisonData: ComparisonData = {
   column1Header: {
@@ -88,6 +99,8 @@ export default function DemoOne({
   onDashboard?: () => void;
 }) {
   const [authModal, setAuthModal] = useState<"login" | "signup" | null>(null);
+  const logoRef = React.useRef<LiquidGlassLogoHandle>(null);
+  const [orbState, setOrbState] = useState<LiquidGlassOrbState>("idle");
   const [theme, setTheme] = useState<"light" | "dark">(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("mygit-theme");
@@ -138,48 +151,155 @@ export default function DemoOne({
     }
   };
 
+  const navigationLinks = [
+    {
+      name: "Menu",
+      items: [
+        { href: "#install", label: "Install CLI", active: true },
+        { href: "#compare", label: "Compare" },
+        { href: "#dashboard", label: "Dashboard" },
+        { href: "#docs", label: "Documentation" },
+      ],
+    },
+    {
+      name: "Platform",
+      items: [
+        { href: "#dashboard", label: "Repositories" },
+        { href: "#dashboard", label: "Pull Requests" },
+        { href: "#dashboard", label: "Issues" },
+      ],
+    },
+  ];
+
   return (
     <div className="relative min-h-screen w-full flex flex-col bg-[#f8f9f5] dark:bg-[#07090e] bg-[linear-gradient(to_right,#e5e7eb_1px,transparent_1px),linear-gradient(to_bottom,#e5e7eb_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,#1b202c_1px,transparent_1px),linear-gradient(to_bottom,#1b202c_1px,transparent_1px)] bg-[size:24px_24px] text-neutral-900 dark:text-neutral-100 transition-colors duration-300 overflow-x-hidden">
       
-      {/* Minimalist Top Navbar */}
-      <header className="sticky top-0 z-40 w-full px-6 sm:px-12 py-3.5 bg-white/70 dark:bg-neutral-950/70 backdrop-blur-md border-b border-neutral-200/80 dark:border-neutral-800/80 flex items-center justify-between">
-        {/* Brand Logo */}
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-[#c8ff29] dark:bg-[#b8ff3c] flex items-center justify-center">
-            <FolderGit2 className="w-4.5 h-4.5 text-neutral-950" />
-          </div>
-          <span className="text-lg font-black tracking-tight text-neutral-950 dark:text-white">mygit</span>
+      {/* Modern Top Navbar */}
+      <header className="sticky top-0 z-40 w-full px-4 sm:px-8 lg:px-12 py-3 bg-white/80 dark:bg-neutral-950/80 backdrop-blur-md border-b border-neutral-200/80 dark:border-neutral-800/80 flex items-center justify-between gap-4">
+        <div className="flex flex-1 items-center justify-start gap-3">
+          <MobileNav nav={navigationLinks} />
+
+          {/* Brand Logo (Left) */}
+          <a
+            href="#"
+            onClick={(e) => {
+              e.preventDefault();
+              logoRef.current?.replay();
+            }}
+            className="flex items-center gap-2.5 group select-none cursor-pointer"
+            title="mygit · Click to replay liquid glass animation"
+          >
+            <div className="relative w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center shadow-xs border border-neutral-200/80 dark:border-neutral-800 bg-neutral-100 dark:bg-neutral-900 shrink-0">
+              <LiquidGlassLogo
+                ref={logoRef}
+                logo="/logo.svg"
+                ending="logo"
+                theme={theme === "dark" ? "dark" : "light"}
+                depth={2.9}
+                className="!min-h-0 !w-full !h-full"
+                style={{ height: "100%", width: "100%", minHeight: 0, background: "transparent" }}
+              />
+            </div>
+            <span className="text-lg font-black tracking-tight text-neutral-950 dark:text-white">mygit</span>
+          </a>
         </div>
 
-        {/* Navigation Links */}
-        <nav className="hidden md:flex items-center gap-7 text-xs font-medium text-neutral-600 dark:text-neutral-300">
-          <a href="#install" className="hover:text-neutral-950 dark:hover:text-[#b8ff3c] transition-colors font-bold text-[#7ecc24] dark:text-[#9dff3a]">
-            Install CLI
-          </a>
-          <a href="#compare" className="hover:text-neutral-950 dark:hover:text-[#b8ff3c] transition-colors">
-            Compare
-          </a>
-          <a href="#repos" className="hover:text-neutral-950 dark:hover:text-[#b8ff3c] transition-colors">
-            Repositories
-          </a>
-          <a href="#pulls" className="hover:text-neutral-950 dark:hover:text-[#b8ff3c] transition-colors">
-            Pull Requests
-          </a>
-          <a href="#engine" className="hover:text-neutral-950 dark:hover:text-[#b8ff3c] transition-colors">
-            CLI Engine
-          </a>
-          <a href="#docs" className="hover:text-neutral-950 dark:hover:text-[#b8ff3c] transition-colors">
-            Docs
-          </a>
-        </nav>
+        {/* Center Desktop Navigation Menu */}
+        <NavigationMenu className="max-md:hidden">
+          <NavigationMenuList className="gap-1">
+            {navigationLinks[0].items.map((link, index) => (
+              <NavigationMenuItem key={index}>
+                <NavigationMenuLink
+                  asChild
+                  href={link.href}
+                  data-active={link.active}
+                  className="whitespace-nowrap rounded-md px-3.5 py-1.5 text-sm font-medium transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white cursor-pointer"
+                  onClick={(e) => {
+                    if (link.href === "#dashboard") {
+                      e.preventDefault();
+                      if (onDashboard) onDashboard();
+                      else window.location.hash = "#dashboard";
+                    }
+                  }}
+                >
+                  <a href={link.href}>{link.label}</a>
+                </NavigationMenuLink>
+              </NavigationMenuItem>
+            ))}
+          </NavigationMenuList>
+        </NavigationMenu>
 
-        {/* Navbar Actions: Theme Toggle */}
-        <div className="flex items-center gap-2 sm:gap-3">
+        {/* Right Action: Liquid Glass Orb (Voice AI) & Theme Toggle (Right Only) */}
+        <div className="flex flex-1 items-center justify-end gap-2.5">
+          {/* ElevenLabs Liquid Glass Voice Orb */}
+          <button
+            type="button"
+            onClick={() => {
+              setOrbState((prev) => {
+                const next: Record<LiquidGlassOrbState, LiquidGlassOrbState> = {
+                  idle: "listening",
+                  listening: "speaking",
+                  speaking: "thinking",
+                  thinking: "searching",
+                  searching: "success",
+                  success: "idle",
+                  error: "idle",
+                };
+                return next[prev] || "idle";
+              });
+            }}
+            className="relative group p-0.5 rounded-full cursor-pointer focus:outline-hidden hover:scale-105 active:scale-95 transition-transform"
+            title={`ElevenLabs AI Voice Orb (${orbState}) · Click to toggle state`}
+            aria-label={`ElevenLabs Voice Assistant: ${orbState}`}
+          >
+            <div className="relative w-9 h-9 rounded-full overflow-hidden flex items-center justify-center shadow-xs border border-neutral-300/80 dark:border-neutral-700/80 bg-neutral-950 shrink-0">
+              <LiquidGlassOrb
+                baseColor="#ffffff"
+                colorA="#000000"
+                colorB="#4d4d4d"
+                colorC="#a9a9a9"
+                seed={145}
+                startTime={18}
+                speed={1.5}
+                distortion={0.8}
+                clusterCount={7.2}
+                clusterIntensity={3}
+                clusterSize={22.5}
+                scale={0.23}
+                spotSize={1.15}
+                rotation={0}
+                softness={0.31}
+                relief={2.94}
+                refraction={0.65}
+                roughness={0}
+                reflection={1.3}
+                caustics={0}
+                dispersion={1}
+                colorDistribution={0}
+                grain={0.3}
+                grainSize={1}
+                paused={false}
+                animateDistortion={true}
+                grainMode="fine"
+                flowType="drift"
+                state={orbState}
+                thinkingAnimation="ripples"
+                searchingAnimation="lens"
+                preserveWhites={true}
+                animateEntrance={true}
+                size={36}
+                audioLevel={orbState === "speaking" ? 0.85 : orbState === "listening" ? 0.6 : 0.3}
+                className="!w-full !h-full"
+                style={{ width: "100%", height: "100%" }}
+              />
+            </div>
+          </button>
+
           {/* Light / Dark Mode Toggle */}
           <button
             onClick={toggleTheme}
             aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-            className="flex items-center justify-center w-8 h-8 rounded-xl border border-neutral-300/80 dark:border-neutral-700/80 bg-neutral-100/70 dark:bg-neutral-900/70 hover:bg-neutral-200/80 dark:hover:bg-neutral-800/80 text-neutral-800 dark:text-neutral-200 shadow-xs transition-all cursor-pointer"
+            className="flex items-center justify-center w-8 h-8 rounded-lg border border-neutral-300/80 dark:border-neutral-700/80 bg-neutral-100/70 dark:bg-neutral-900/70 hover:bg-neutral-200/80 dark:hover:bg-neutral-800/80 text-neutral-800 dark:text-neutral-200 shadow-xs transition-all cursor-pointer ml-1"
             title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
           >
             {theme === "dark" ? (
@@ -199,10 +319,14 @@ export default function DemoOne({
         />
 
         {/* Windows / macOS / Linux CLI Download & Auto-Environment Installer */}
-        <InstallSection />
+        <div id="install" className="w-full flex justify-center scroll-mt-24">
+          <InstallSection />
+        </div>
 
         {/* Comparison Section (mygit vs Git & Cloud) */}
-        <CompareUILib data={mygitComparisonData} />
+        <div id="compare" className="w-full flex justify-center scroll-mt-24">
+          <CompareUILib data={mygitComparisonData} />
+        </div>
       </main>
 
       {/* Modern Wordmark Footer */}
