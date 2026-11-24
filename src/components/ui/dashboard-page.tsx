@@ -187,18 +187,20 @@ export function DashboardPage({
       .then((backendRepos) => {
         if (!isMounted) return;
         if (Array.isArray(backendRepos)) {
-          const mapped = backendRepos.map((r) => ({
+          const mapped = backendRepos.map((r: any) => ({
             id: String(r.id),
             name: r.name,
             description: r.description || "No description provided.",
             lang: "Rust",
             langColor: "bg-orange-500",
-            stars: 0,
-            forks: 0,
+            stars: r.starsCount || 0,
+            forks: r.forksCount || 0,
             isStarred: false,
             updated: "Just now",
             isPrivate: r.isPrivate,
-            lastAction: "Created in Neon Cloud",
+            ownerUsername: r.ownerUsername,
+            forkedFrom: r.forkedFrom,
+            lastAction: r.forkedFrom ? `Forked from @${r.forkedFrom}` : "Created in Neon Cloud",
           }));
           setRepos(mapped);
         }
@@ -484,12 +486,27 @@ export function DashboardPage({
       });
   }, [repos, repoSearch, repoTypeFilter, repoLangFilter, repoSort]);
 
-  const toggleStar = (id: string) => {
+  const toggleStar = async (id: string) => {
+    const targetRepo = repos.find((r) => r.id === id);
+    if (!targetRepo) return;
+
+    // Optimistic UI update
     setRepos((prev) =>
       prev.map((r) =>
-        r.id === id ? { ...r, isStarred: !r.isStarred, stars: r.isStarred ? r.stars - 1 : r.stars + 1 } : r
+        r.id === id ? { ...r, isStarred: !r.isStarred, stars: r.isStarred ? Math.max(0, r.stars - 1) : r.stars + 1 } : r
       )
     );
+
+    try {
+      const res = await repoApi.toggleStar(targetRepo.name);
+      setRepos((prev) =>
+        prev.map((r) =>
+          r.id === id ? { ...r, isStarred: res.starred, stars: res.starCount } : r
+        )
+      );
+    } catch (err) {
+      console.error("Star toggle error:", err);
+    }
   };
 
   // -------------------------------------------------------------
@@ -664,6 +681,20 @@ export function DashboardPage({
     setQuickStepsDone((prev) => ({ ...prev, [index]: !prev[index] }));
   };
 
+  const handleRepoRenamed = (oldName: string, newName: string) => {
+    setRepos((prev) =>
+      prev.map((r) => (r.name === oldName ? { ...r, name: newName } : r))
+    );
+    setSelectedRepoForTree((prev: any) =>
+      prev && prev.name === oldName ? { ...prev, name: newName } : prev
+    );
+  };
+
+  const handleRepoDeleted = (name: string) => {
+    setRepos((prev) => prev.filter((r) => r.name !== name));
+    setSelectedRepoForTree(null);
+  };
+
   // -------------------------------------------------------------
   // RENDER MAIN CONTENT VIEW SWITCHER
   // -------------------------------------------------------------
@@ -675,7 +706,11 @@ export function DashboardPage({
           ownerUsername={selectedRepoForTree.ownerUsername || username}
           isPrivate={selectedRepoForTree.isPrivate}
           description={selectedRepoForTree.description}
+          forkedFrom={selectedRepoForTree.forkedFrom}
+          currentUsername={username}
           onBack={() => setSelectedRepoForTree(null)}
+          onRepoRenamed={handleRepoRenamed}
+          onRepoDeleted={handleRepoDeleted}
         />
       );
     }
@@ -1078,7 +1113,11 @@ export function DashboardPage({
               ownerUsername={selectedRepoForTree.ownerUsername || username}
               isPrivate={selectedRepoForTree.isPrivate}
               description={selectedRepoForTree.description}
+              forkedFrom={selectedRepoForTree.forkedFrom}
+              currentUsername={username}
               onBack={() => setSelectedRepoForTree(null)}
+              onRepoRenamed={handleRepoRenamed}
+              onRepoDeleted={handleRepoDeleted}
             />
           );
         }
@@ -1175,7 +1214,7 @@ export function DashboardPage({
                     className="p-5 rounded-xl border border-border/50 bg-foreground/5 hover:border-border transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4"
                   >
                     <div className="space-y-1.5 flex-1">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span
                           onClick={() => setSelectedRepoForTree(repo)}
                           className="font-semibold text-sm text-foreground hover:underline cursor-pointer"
@@ -1194,6 +1233,12 @@ export function DashboardPage({
                           )}
                         </span>
                       </div>
+                      {(repo as any).forkedFrom && (
+                        <div className="flex items-center gap-1 text-[11px] font-mono text-foreground/60">
+                          <GitFork className="size-3 text-emerald-400" />
+                          <span>forked from @{(repo as any).forkedFrom}</span>
+                        </div>
+                      )}
                       <p className="text-xs text-foreground/60 max-w-2xl leading-relaxed">{repo.description}</p>
                       <div className="flex items-center gap-4 text-xs text-foreground/40 font-mono pt-1">
                         <span className="flex items-center gap-1.5">

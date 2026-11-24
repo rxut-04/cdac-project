@@ -52,8 +52,11 @@ export interface RepositoryItem {
   name: string;
   description: string;
   isPrivate: boolean;
-  ownerId: number;
+  ownerId?: number;
   ownerUsername: string;
+  forkedFrom?: string;
+  starsCount?: number;
+  forksCount?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -116,5 +119,35 @@ export const repoApi = {
 
   delete: async (name: string): Promise<void> => {
     await api.delete(`/repos/${encodeURIComponent(name)}`);
+  },
+
+  getStarStatus: async (name: string): Promise<{ starred: boolean; starCount: number }> => {
+    const res = await api.get<{ starred: boolean; starCount: number }>(`/repos/${encodeURIComponent(name)}/star`);
+    return res.data;
+  },
+
+  toggleStar: async (name: string): Promise<{ starred: boolean; starCount: number }> => {
+    const res = await api.post<{ starred: boolean; starCount: number }>(`/repos/${encodeURIComponent(name)}/star`);
+    return res.data;
+  },
+
+  fork: async (name: string): Promise<RepositoryItem> => {
+    const res = await api.post<RepositoryItem>(`/repos/${encodeURIComponent(name)}/fork`);
+    return res.data;
+  },
+
+  update: async (name: string, data: { name?: string; description?: string }): Promise<RepositoryItem> => {
+    const res = await api.patch<RepositoryItem>(`/repos/${encodeURIComponent(name)}`, data);
+    return res.data;
+  },
+
+  updateVisibility: async (name: string, isPrivate: boolean): Promise<RepositoryItem> => {
+    const res = await api.patch<RepositoryItem>(`/repos/${encodeURIComponent(name)}/visibility`, { isPrivate });
+    return res.data;
+  },
+
+  transfer: async (name: string, newOwnerUsername: string): Promise<RepositoryItem> => {
+    const res = await api.post<RepositoryItem>(`/repos/${encodeURIComponent(name)}/transfer`, { newOwnerUsername });
+    return res.data;
   },
 };

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useState, useMemo, useEffect } from "react";
-import { api } from "@/lib/api";
+import { api, repoApi } from "@/lib/api";
 import {
   FileTree,
   FileTreeNode,
@@ -36,6 +36,14 @@ import {
   Send,
   AlertCircle,
   CheckCircle2,
+  Star,
+  GitFork,
+  Settings,
+  Trash2,
+  ShieldAlert,
+  ArrowRightLeft,
+  Loader2,
+  AlertTriangle,
 } from "lucide-react";
 
 export interface RepoFileExplorerProps {
@@ -43,7 +51,11 @@ export interface RepoFileExplorerProps {
   ownerUsername: string;
   isPrivate?: boolean;
   description?: string;
+  forkedFrom?: string;
+  currentUsername?: string;
   onBack: () => void;
+  onRepoRenamed?: (oldName: string, newName: string) => void;
+  onRepoDeleted?: (name: string) => void;
 }
 
 interface RepoFile {
@@ -362,19 +374,183 @@ function renderMarkdownContent(content: string) {
 }
 
 export function RepoFileExplorer({
-  repoName,
+  repoName: initialRepoName,
   ownerUsername,
-  isPrivate = false,
-  description,
+  isPrivate: initialIsPrivate = false,
+  description: initialDescription,
+  forkedFrom: initialForkedFrom,
+  currentUsername,
   onBack,
+  onRepoRenamed,
+  onRepoDeleted,
 }: RepoFileExplorerProps) {
-  const initialFiles = useMemo(() => getInitialFilesForRepo(repoName, ownerUsername), [repoName, ownerUsername]);
+  const [currentRepoName, setCurrentRepoName] = useState(initialRepoName);
+  const [currentDescription, setCurrentDescription] = useState(initialDescription || "");
+  const [currentIsPrivate, setCurrentIsPrivate] = useState(initialIsPrivate);
+  const [forkedFrom, setForkedFrom] = useState(initialForkedFrom);
+
+  const initialFiles = useMemo(() => getInitialFilesForRepo(currentRepoName, ownerUsername), [currentRepoName, ownerUsername]);
   const [files, setFiles] = useState<RepoFile[]>(initialFiles);
   const [selectedPath, setSelectedPath] = useState<string>("README.md");
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Navigation Tabs: "code" | "commits" | "pulls" | "issues"
-  const [activeTab, setActiveTab] = useState<"code" | "commits" | "pulls" | "issues">("code");
+  // Navigation Tabs: "code" | "commits" | "pulls" | "issues" | "settings"
+  const [activeTab, setActiveTab] = useState<"code" | "commits" | "pulls" | "issues" | "settings">("code");
+
+  // Star & Fork states
+  const [starred, setStarred] = useState(false);
+  const [starCount, setStarCount] = useState(0);
+  const [starring, setStarring] = useState(false);
+  const [forking, setForking] = useState(false);
+
+  // Settings states
+  const [editName, setEditName] = useState(initialRepoName);
+  const [editDesc, setEditDesc] = useState(initialDescription || "");
+  const [renaming, setRenaming] = useState(false);
+  const [updatingDesc, setUpdatingDesc] = useState(false);
+  const [updatingVisibility, setUpdatingVisibility] = useState(false);
+  const [transferTarget, setTransferTarget] = useState("");
+  const [transferring, setTransferring] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deleting, setDeleting] = useState(false);
+
+  // Fetch initial star status
+  useEffect(() => {
+    let isMounted = true;
+    repoApi.getStarStatus(currentRepoName)
+      .then((res) => {
+        if (!isMounted) return;
+        setStarred(res.starred);
+        setStarCount(res.starCount);
+      })
+      .catch(() => {});
+    return () => { isMounted = false; };
+  }, [currentRepoName]);
+
+  // Star toggle handler
+  const handleToggleStar = async () => {
+    if (starring) return;
+    setStarring(true);
+    try {
+      const res = await repoApi.toggleStar(currentRepoName);
+      setStarred(res.starred);
+      setStarCount(res.starCount);
+    } catch (err: any) {
+      console.error("Failed to toggle star:", err);
+    } finally {
+      setStarring(false);
+    }
+  };
+
+  // Fork handler
+  const handleForkRepo = async () => {
+    if (forking) return;
+    setForking(true);
+    try {
+      const res = await repoApi.fork(currentRepoName);
+      alert(`Repository "${currentRepoName}" successfully forked to your account as "${res.name}"!`);
+      if (onRepoRenamed) {
+        onRepoRenamed(currentRepoName, res.name);
+      }
+    } catch (err: any) {
+      const msg = err.response?.data?.error || err.message || "Failed to fork repository";
+      alert(`Fork failed: ${msg}`);
+    } finally {
+      setForking(false);
+    }
+  };
+
+  // Settings: Rename handler
+  const handleRenameRepo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editName.trim() || editName.trim() === currentRepoName) return;
+    setRenaming(true);
+    try {
+      const res = await repoApi.update(currentRepoName, { name: editName.trim() });
+      const oldName = currentRepoName;
+      setCurrentRepoName(res.name);
+      if (onRepoRenamed) {
+        onRepoRenamed(oldName, res.name);
+      }
+      alert(`Repository renamed to "${res.name}" successfully!`);
+    } catch (err: any) {
+      alert(`Rename failed: ${err.response?.data?.error || err.message}`);
+    } finally {
+      setRenaming(false);
+    }
+  };
+
+  // Settings: Description handler
+  const handleUpdateDescription = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setUpdatingDesc(true);
+    try {
+      const res = await repoApi.update(currentRepoName, { description: editDesc.trim() });
+      setCurrentDescription(res.description || "");
+      alert("Repository description updated successfully!");
+    } catch (err: any) {
+      alert(`Update failed: ${err.response?.data?.error || err.message}`);
+    } finally {
+      setUpdatingDesc(false);
+    }
+  };
+
+  // Settings: Visibility toggle handler
+  const handleToggleVisibility = async () => {
+    setUpdatingVisibility(true);
+    try {
+      const nextState = !currentIsPrivate;
+      const res = await repoApi.updateVisibility(currentRepoName, nextState);
+      setCurrentIsPrivate(res.isPrivate);
+      alert(`Repository visibility changed to ${res.isPrivate ? "Private" : "Public"}!`);
+    } catch (err: any) {
+      alert(`Visibility change failed: ${err.response?.data?.error || err.message}`);
+    } finally {
+      setUpdatingVisibility(false);
+    }
+  };
+
+  // Settings: Transfer ownership handler
+  const handleTransferOwnership = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!transferTarget.trim()) return;
+    if (!window.confirm(`Are you sure you want to transfer "${currentRepoName}" to @${transferTarget.trim()}? You will lose ownership of this repository.`)) {
+      return;
+    }
+    setTransferring(true);
+    try {
+      await repoApi.transfer(currentRepoName, transferTarget.trim());
+      alert(`Repository "${currentRepoName}" transferred to @${transferTarget.trim()} successfully!`);
+      if (onRepoDeleted) {
+        onRepoDeleted(currentRepoName);
+      } else {
+        onBack();
+      }
+    } catch (err: any) {
+      alert(`Transfer failed: ${err.response?.data?.error || err.message}`);
+      setTransferring(false);
+    }
+  };
+
+  // Settings: Delete repository handler
+  const handleDeleteRepo = async () => {
+    if (deleteConfirmText.trim() !== `${ownerUsername}/${currentRepoName}`) return;
+    setDeleting(true);
+    try {
+      await repoApi.delete(currentRepoName);
+      setDeleteModalOpen(false);
+      alert(`Repository "${currentRepoName}" deleted permanently.`);
+      if (onRepoDeleted) {
+        onRepoDeleted(currentRepoName);
+      } else {
+        onBack();
+      }
+    } catch (err: any) {
+      alert(`Delete failed: ${err.response?.data?.error || err.message}`);
+      setDeleting(false);
+    }
+  };
 
   // Branches
   const [branches, setBranches] = useState<BranchItem[]>([{ name: "main", isDefault: true }]);
@@ -425,13 +601,13 @@ export function RepoFileExplorer({
   const [copiedHttps, setCopiedHttps] = useState(false);
   const [copiedSha, setCopiedSha] = useState<string | null>(null);
 
-  const cloneCmd = `mygit clone https://mygit-backend-y27o.onrender.com/api/repos/${repoName}`;
-  const httpsUrl = `https://mygit-backend-y27o.onrender.com/api/repos/${repoName}`;
-  const downloadZipUrl = `https://mygit-backend-y27o.onrender.com/api/repos/${encodeURIComponent(repoName)}/archive/zip?branch=${encodeURIComponent(currentBranch)}`;
+  const cloneCmd = `mygit clone https://mygit-backend-y27o.onrender.com/api/repos/${currentRepoName}`;
+  const httpsUrl = `https://mygit-backend-y27o.onrender.com/api/repos/${currentRepoName}`;
+  const downloadZipUrl = `https://mygit-backend-y27o.onrender.com/api/repos/${encodeURIComponent(currentRepoName)}/archive/zip?branch=${encodeURIComponent(currentBranch)}`;
 
   // Fetch branches
   useEffect(() => {
-    api.get(`/repos/${encodeURIComponent(repoName)}/branches`)
+    api.get(`/repos/${encodeURIComponent(currentRepoName)}/branches`)
       .then((res) => {
         if (Array.isArray(res.data) && res.data.length > 0) {
           setBranches(res.data);
@@ -442,12 +618,12 @@ export function RepoFileExplorer({
         }
       })
       .catch(() => {});
-  }, [repoName]);
+  }, [currentRepoName]);
 
   // Fetch files for active branch
   useEffect(() => {
     let isMounted = true;
-    api.get(`/repos/${encodeURIComponent(repoName)}/files?branch=${encodeURIComponent(currentBranch)}`)
+    api.get(`/repos/${encodeURIComponent(currentRepoName)}/files?branch=${encodeURIComponent(currentBranch)}`)
       .then((res) => {
         if (!isMounted) return;
         if (Array.isArray(res.data) && res.data.length > 0) {
@@ -463,12 +639,12 @@ export function RepoFileExplorer({
       .catch(() => {});
 
     return () => { isMounted = false; };
-  }, [repoName, currentBranch]);
+  }, [currentRepoName, currentBranch]);
 
   // Fetch commits
   useEffect(() => {
     let isMounted = true;
-    api.get(`/repos/${encodeURIComponent(repoName)}/commits`)
+    api.get(`/repos/${encodeURIComponent(currentRepoName)}/commits`)
       .then((res) => {
         if (!isMounted) return;
         if (Array.isArray(res.data)) {
@@ -478,12 +654,12 @@ export function RepoFileExplorer({
       .catch(() => {});
 
     return () => { isMounted = false; };
-  }, [repoName]);
+  }, [currentRepoName]);
 
   // Fetch Pull Requests
   const fetchPullRequests = () => {
     setLoadingPulls(true);
-    api.get(`/repos/${encodeURIComponent(repoName)}/pulls?status=${prStatusFilter}`)
+    api.get(`/repos/${encodeURIComponent(currentRepoName)}/pulls?status=${prStatusFilter}`)
       .then((res) => {
         if (Array.isArray(res.data)) {
           setPullRequests(res.data);
@@ -495,7 +671,7 @@ export function RepoFileExplorer({
 
   useEffect(() => {
     fetchPullRequests();
-  }, [repoName, prStatusFilter]);
+  }, [currentRepoName, prStatusFilter]);
 
   // Fetch commit diff when a commit is selected
   useEffect(() => {
@@ -504,18 +680,18 @@ export function RepoFileExplorer({
       return;
     }
     setLoadingCommitDiff(true);
-    api.get(`/repos/${encodeURIComponent(repoName)}/commits/${encodeURIComponent(selectedCommitSha)}/diff`)
+    api.get(`/repos/${encodeURIComponent(currentRepoName)}/commits/${encodeURIComponent(selectedCommitSha)}/diff`)
       .then((res) => {
         if (res.data) setCommitDiffData(res.data);
       })
       .catch(() => {})
       .finally(() => setLoadingCommitDiff(false));
-  }, [repoName, selectedCommitSha]);
+  }, [currentRepoName, selectedCommitSha]);
 
   // Fetch PR detail when a PR is selected
   const loadPrDetail = (num: number) => {
     setLoadingPrDetail(true);
-    api.get(`/repos/${encodeURIComponent(repoName)}/pulls/${num}`)
+    api.get(`/repos/${encodeURIComponent(currentRepoName)}/pulls/${num}`)
       .then((res) => {
         if (res.data) setPrDetail(res.data);
       })
@@ -529,7 +705,7 @@ export function RepoFileExplorer({
     } else {
       setPrDetail(null);
     }
-  }, [repoName, selectedPrNumber]);
+  }, [currentRepoName, selectedPrNumber]);
 
   // Create PR
   const handleCreatePr = (e: React.FormEvent) => {
@@ -537,7 +713,7 @@ export function RepoFileExplorer({
     if (!newPrTitle.trim() || !newPrSource.trim()) return;
 
     setPrSubmitting(true);
-    api.post(`/repos/${encodeURIComponent(repoName)}/pulls`, {
+    api.post(`/repos/${encodeURIComponent(currentRepoName)}/pulls`, {
       title: newPrTitle.trim(),
       description: newPrDesc.trim(),
       sourceBranch: newPrSource.trim(),
@@ -562,7 +738,7 @@ export function RepoFileExplorer({
   const handleMergePr = () => {
     if (!selectedPrNumber) return;
     setPrMerging(true);
-    api.post(`/repos/${encodeURIComponent(repoName)}/pulls/${selectedPrNumber}/merge`)
+    api.post(`/repos/${encodeURIComponent(currentRepoName)}/pulls/${selectedPrNumber}/merge`)
       .then(() => {
         loadPrDetail(selectedPrNumber);
         fetchPullRequests();
@@ -578,7 +754,7 @@ export function RepoFileExplorer({
     e.preventDefault();
     if (!selectedPrNumber || !prCommentText.trim()) return;
 
-    api.post(`/repos/${encodeURIComponent(repoName)}/pulls/${selectedPrNumber}/comments`, {
+    api.post(`/repos/${encodeURIComponent(currentRepoName)}/pulls/${selectedPrNumber}/comments`, {
       commentText: prCommentText.trim(),
     })
       .then(() => {
@@ -593,7 +769,7 @@ export function RepoFileExplorer({
   // Fetch Issues
   const fetchIssues = () => {
     setLoadingIssues(true);
-    api.get(`/repos/${encodeURIComponent(repoName)}/issues?status=${issueStatusFilter}`)
+    api.get(`/repos/${encodeURIComponent(currentRepoName)}/issues?status=${issueStatusFilter}`)
       .then((res) => {
         if (Array.isArray(res.data)) {
           setIssues(res.data);
@@ -605,12 +781,12 @@ export function RepoFileExplorer({
 
   useEffect(() => {
     fetchIssues();
-  }, [repoName, issueStatusFilter]);
+  }, [currentRepoName, issueStatusFilter]);
 
   // Fetch issue detail when an issue is selected
   const loadIssueDetail = (num: number) => {
     setLoadingIssueDetail(true);
-    api.get(`/repos/${encodeURIComponent(repoName)}/issues/${num}`)
+    api.get(`/repos/${encodeURIComponent(currentRepoName)}/issues/${num}`)
       .then((res) => {
         if (res.data) setIssueDetail(res.data);
       })
@@ -624,7 +800,7 @@ export function RepoFileExplorer({
     } else {
       setIssueDetail(null);
     }
-  }, [repoName, selectedIssueNumber]);
+  }, [currentRepoName, selectedIssueNumber]);
 
   // Create Issue
   const handleCreateIssue = (e: React.FormEvent) => {
@@ -632,7 +808,7 @@ export function RepoFileExplorer({
     if (!newIssueTitle.trim()) return;
 
     setIssueSubmitting(true);
-    api.post(`/repos/${encodeURIComponent(repoName)}/issues`, {
+    api.post(`/repos/${encodeURIComponent(currentRepoName)}/issues`, {
       title: newIssueTitle.trim(),
       description: newIssueDesc.trim(),
       labels: newIssueLabels.join(","),
@@ -659,7 +835,7 @@ export function RepoFileExplorer({
     setUpdatingIssueStatus(true);
     const nextStatus = issueDetail.status === "OPEN" ? "CLOSED" : "OPEN";
 
-    api.patch(`/repos/${encodeURIComponent(repoName)}/issues/${selectedIssueNumber}/status`, {
+    api.patch(`/repos/${encodeURIComponent(currentRepoName)}/issues/${selectedIssueNumber}/status`, {
       status: nextStatus,
     })
       .then((res) => {
@@ -679,7 +855,7 @@ export function RepoFileExplorer({
     e.preventDefault();
     if (!selectedIssueNumber || !issueCommentText.trim()) return;
 
-    api.post(`/repos/${encodeURIComponent(repoName)}/issues/${selectedIssueNumber}/comments`, {
+    api.post(`/repos/${encodeURIComponent(currentRepoName)}/issues/${selectedIssueNumber}/comments`, {
       commentText: issueCommentText.trim(),
     })
       .then((res) => {
@@ -739,7 +915,7 @@ export function RepoFileExplorer({
     <div className="space-y-6 max-w-6xl mx-auto pb-12 animate-in fade-in duration-200">
       {/* Top Header Bar */}
       <div className="flex flex-col gap-4 border-b border-border/40 pb-5">
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
           <button
             type="button"
             onClick={onBack}
@@ -749,100 +925,138 @@ export function RepoFileExplorer({
             <span>Back to Repositories</span>
           </button>
 
-          {/* GitHub-style "Code ▾" Dropdown */}
-          <div className="relative">
+          {/* Top Actions: Star, Fork, and Code Dropdown */}
+          <div className="flex items-center gap-2">
+            {/* Star / Unstar Button */}
             <button
               type="button"
-              onClick={() => setCodeDropdownOpen(!codeDropdownOpen)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-sm transition-all"
+              onClick={handleToggleStar}
+              disabled={starring}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-mono font-medium transition-all shadow-xs ${
+                starred
+                  ? "bg-amber-500/15 border-amber-500/40 text-amber-500 hover:bg-amber-500/25"
+                  : "border-border/50 bg-foreground/5 hover:bg-foreground/10 text-foreground/80 hover:text-foreground"
+              }`}
+              title={starred ? "Unstar this repository" : "Star this repository"}
             >
-              <Code className="size-3.5" />
-              <span>Code</span>
-              <ChevronDown className="size-3 opacity-80" />
+              <Star className={`size-3.5 ${starred ? "fill-amber-400 text-amber-400" : ""}`} />
+              <span>{starred ? "Starred" : "Star"}</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-foreground/10 ml-0.5">
+                {starCount}
+              </span>
             </button>
 
-            {codeDropdownOpen && (
-              <div
-                className="absolute right-0 mt-2 w-80 rounded-xl border border-border/60 bg-popover text-popover-foreground shadow-xl p-3.5 z-50 text-xs font-sans space-y-3 animate-in fade-in zoom-in-95 duration-150"
-                onClick={(e) => e.stopPropagation()}
+            {/* Fork Button */}
+            <button
+              type="button"
+              onClick={handleForkRepo}
+              disabled={forking}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border/50 bg-foreground/5 hover:bg-foreground/10 text-xs font-mono font-medium text-foreground/80 hover:text-foreground transition-all shadow-xs disabled:opacity-50"
+              title="Fork this repository into your account"
+            >
+              {forking ? (
+                <Loader2 className="size-3.5 animate-spin text-emerald-400" />
+              ) : (
+                <GitFork className="size-3.5 text-foreground/60" />
+              )}
+              <span>{forking ? "Forking..." : "Fork"}</span>
+            </button>
+
+            {/* GitHub-style "Code ▾" Dropdown */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setCodeDropdownOpen(!codeDropdownOpen)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-sm transition-all"
               >
-                <div className="flex items-center justify-between font-semibold text-foreground/90 border-b border-border/30 pb-2">
-                  <span className="flex items-center gap-1.5">
-                    <Terminal className="size-3.5 text-emerald-400" />
-                    Clone repository
-                  </span>
-                  <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
-                    HTTPS / CLI
-                  </span>
-                </div>
+                <Code className="size-3.5" />
+                <span>Code</span>
+                <ChevronDown className="size-3 opacity-80" />
+              </button>
 
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-mono text-foreground/60">Clone with Web URL</label>
-                  <div className="flex items-center gap-1.5 bg-foreground/5 border border-border/40 rounded-lg p-1.5">
-                    <input
-                      type="text"
-                      readOnly
-                      value={httpsUrl}
-                      className="bg-transparent text-[11px] font-mono text-foreground/80 flex-1 truncate outline-none select-all px-1"
-                    />
-                    <button
-                      type="button"
-                      onClick={copyHttpsUrl}
-                      className="p-1 rounded text-foreground/60 hover:text-foreground hover:bg-foreground/10 transition-colors"
-                      title="Copy HTTPS URL"
+              {codeDropdownOpen && (
+                <div
+                  className="absolute right-0 mt-2 w-80 rounded-xl border border-border/60 bg-popover text-popover-foreground shadow-xl p-3.5 z-50 text-xs font-sans space-y-3 animate-in fade-in zoom-in-95 duration-150"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="flex items-center justify-between font-semibold text-foreground/90 border-b border-border/30 pb-2">
+                    <span className="flex items-center gap-1.5">
+                      <Terminal className="size-3.5 text-emerald-400" />
+                      Clone repository
+                    </span>
+                    <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                      HTTPS / CLI
+                    </span>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-mono text-foreground/60">Clone with Web URL</label>
+                    <div className="flex items-center gap-1.5 bg-foreground/5 border border-border/40 rounded-lg p-1.5">
+                      <input
+                        type="text"
+                        readOnly
+                        value={httpsUrl}
+                        className="bg-transparent text-[11px] font-mono text-foreground/80 flex-1 truncate outline-none select-all px-1"
+                      />
+                      <button
+                        type="button"
+                        onClick={copyHttpsUrl}
+                        className="p-1 rounded text-foreground/60 hover:text-foreground hover:bg-foreground/10 transition-colors"
+                        title="Copy HTTPS URL"
+                      >
+                        {copiedHttps ? <Check className="size-3.5 text-emerald-400" /> : <Copy className="size-3.5" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-mono text-foreground/60">mygit CLI command</label>
+                    <div className="flex items-center gap-1.5 bg-foreground/5 border border-border/40 rounded-lg p-1.5">
+                      <span className="text-foreground/40 font-mono text-[11px] pl-1 select-none">$</span>
+                      <input
+                        type="text"
+                        readOnly
+                        value={cloneCmd}
+                        className="bg-transparent text-[11px] font-mono text-foreground/80 flex-1 truncate outline-none select-all px-1"
+                      />
+                      <button
+                        type="button"
+                        onClick={copyCloneCmd}
+                        className="p-1 rounded text-foreground/60 hover:text-foreground hover:bg-foreground/10 transition-colors"
+                        title="Copy CLI command"
+                      >
+                        {copiedClone ? <Check className="size-3.5 text-emerald-400" /> : <Copy className="size-3.5" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="pt-1 border-t border-border/30">
+                    <a
+                      href={downloadZipUrl}
+                      download={`${currentRepoName}-${currentBranch}.zip`}
+                      className="flex items-center justify-center gap-2 w-full py-2 rounded-lg bg-foreground/5 hover:bg-foreground/10 border border-border/40 text-foreground text-xs font-medium transition-colors"
+                      onClick={() => setCodeDropdownOpen(false)}
                     >
-                      {copiedHttps ? <Check className="size-3.5 text-emerald-400" /> : <Copy className="size-3.5" />}
-                    </button>
+                      <Download className="size-3.5 text-emerald-400" />
+                      <span>Download ZIP Archive</span>
+                    </a>
                   </div>
                 </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-mono text-foreground/60">mygit CLI command</label>
-                  <div className="flex items-center gap-1.5 bg-foreground/5 border border-border/40 rounded-lg p-1.5">
-                    <span className="text-foreground/40 font-mono text-[11px] pl-1 select-none">$</span>
-                    <input
-                      type="text"
-                      readOnly
-                      value={cloneCmd}
-                      className="bg-transparent text-[11px] font-mono text-foreground/80 flex-1 truncate outline-none select-all px-1"
-                    />
-                    <button
-                      type="button"
-                      onClick={copyCloneCmd}
-                      className="p-1 rounded text-foreground/60 hover:text-foreground hover:bg-foreground/10 transition-colors"
-                      title="Copy CLI command"
-                    >
-                      {copiedClone ? <Check className="size-3.5 text-emerald-400" /> : <Copy className="size-3.5" />}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="pt-1 border-t border-border/30">
-                  <a
-                    href={downloadZipUrl}
-                    download={`${repoName}-${currentBranch}.zip`}
-                    className="flex items-center justify-center gap-2 w-full py-2 rounded-lg bg-foreground/5 hover:bg-foreground/10 border border-border/40 text-foreground text-xs font-medium transition-colors"
-                    onClick={() => setCodeDropdownOpen(false)}
-                  >
-                    <Download className="size-3.5 text-emerald-400" />
-                    <span>Download ZIP Archive</span>
-                  </a>
-                </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
 
         {/* Repo Title & Badges */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <div className="flex items-center gap-2.5 flex-wrap">
               <FolderGit2 className="size-5 text-emerald-400" />
               <span className="text-foreground/50 text-sm font-mono">@{ownerUsername}</span>
               <span className="text-foreground/40 font-mono">/</span>
-              <h2 className="text-xl font-bold tracking-tight text-foreground">{repoName}</h2>
+              <h2 className="text-xl font-bold tracking-tight text-foreground">{currentRepoName}</h2>
               <span className="inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-full border border-border/50 text-foreground/60 bg-foreground/5">
-                {isPrivate ? (
+                {currentIsPrivate ? (
                   <>
                     <Lock className="size-2.5" /> Private
                   </>
@@ -853,12 +1067,19 @@ export function RepoFileExplorer({
                 )}
               </span>
             </div>
-            {description && (
-              <p className="text-xs text-foreground/60 max-w-3xl leading-relaxed">{description}</p>
+            {forkedFrom && (
+              <div className="flex items-center gap-1.5 text-xs font-mono text-foreground/60">
+                <GitFork className="size-3 text-emerald-400" />
+                <span>forked from</span>
+                <span className="text-emerald-500 font-semibold">@{forkedFrom}</span>
+              </div>
+            )}
+            {currentDescription && (
+              <p className="text-xs text-foreground/60 max-w-3xl leading-relaxed">{currentDescription}</p>
             )}
           </div>
 
-          <div className="flex items-center gap-2 text-xs font-mono">
+          <div className="flex items-center gap-2 text-xs font-mono flex-wrap">
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-foreground/5 border border-border/40 text-foreground/75">
               <Layers className="size-3 text-emerald-400" />
               <span>{files.length} files</span>
@@ -933,14 +1154,15 @@ export function RepoFileExplorer({
             )}
           </div>
 
-          {/* Navigation Tabs (Code / Commits / Pull Requests) */}
-          <div className="flex items-center gap-1 p-0.5 rounded-lg bg-foreground/5 border border-border/40">
+          {/* Navigation Tabs (Code / Commits / Pull Requests / Issues / Settings) */}
+          <div className="flex items-center gap-1 p-0.5 rounded-lg bg-foreground/5 border border-border/40 flex-wrap">
             <button
               type="button"
               onClick={() => {
                 setActiveTab("code");
                 setSelectedCommitSha(null);
                 setSelectedPrNumber(null);
+                setSelectedIssueNumber(null);
               }}
               className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs font-medium transition-all ${
                 activeTab === "code"
@@ -957,6 +1179,7 @@ export function RepoFileExplorer({
               onClick={() => {
                 setActiveTab("commits");
                 setSelectedPrNumber(null);
+                setSelectedIssueNumber(null);
               }}
               className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs font-medium transition-all ${
                 activeTab === "commits"
@@ -1009,6 +1232,25 @@ export function RepoFileExplorer({
               <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-foreground/10 text-foreground/70">
                 {issues.length}
               </span>
+            </button>
+
+            {/* 5th Tab: Settings */}
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab("settings");
+                setSelectedCommitSha(null);
+                setSelectedPrNumber(null);
+                setSelectedIssueNumber(null);
+              }}
+              className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs font-medium transition-all ${
+                activeTab === "settings"
+                  ? "bg-foreground/15 text-foreground shadow-xs font-semibold"
+                  : "text-foreground/60 hover:text-foreground"
+              }`}
+            >
+              <Settings className="size-3.5 text-neutral-400" />
+              <span>Settings</span>
             </button>
           </div>
         </div>
@@ -1958,6 +2200,221 @@ export function RepoFileExplorer({
                   ))}
                 </div>
               )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB 5: REPOSITORY SETTINGS & DANGER ZONE */}
+      {activeTab === "settings" && (
+        <div className="space-y-8 animate-in fade-in duration-150">
+          {/* Header */}
+          <div className="border-b border-border/40 pb-4">
+            <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+              <Settings className="size-5 text-emerald-400" />
+              Repository Settings
+            </h3>
+            <p className="text-xs text-foreground/60 mt-1">
+              Manage repository configuration, visibility, naming, and administrative options.
+            </p>
+          </div>
+
+          {/* Section 1: General Settings */}
+          <div className="rounded-xl border border-border/50 bg-foreground/5 p-5 space-y-6">
+            <h4 className="text-sm font-semibold text-foreground flex items-center gap-2 border-b border-border/30 pb-3">
+              <FolderGit2 className="size-4 text-emerald-400" />
+              General Settings
+            </h4>
+
+            {/* Rename Repo */}
+            <form onSubmit={handleRenameRepo} className="space-y-3">
+              <label className="text-xs font-medium text-foreground/80 block">
+                Repository name
+              </label>
+              <div className="flex items-center gap-3 max-w-md">
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="flex-1 px-3 py-1.5 rounded-lg border border-border/50 bg-background text-foreground text-xs font-mono focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  placeholder="new-repository-name"
+                  required
+                />
+                <button
+                  type="submit"
+                  disabled={renaming || !editName.trim() || editName.trim() === currentRepoName}
+                  className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-medium transition-colors inline-flex items-center gap-1.5 shrink-0"
+                >
+                  {renaming && <Loader2 className="size-3 animate-spin" />}
+                  <span>Rename</span>
+                </button>
+              </div>
+              <p className="text-[11px] text-foreground/50">
+                Renaming will update the remote clone URL immediately.
+              </p>
+            </form>
+
+            {/* Description */}
+            <form onSubmit={handleUpdateDescription} className="space-y-3 pt-4 border-t border-border/30">
+              <label className="text-xs font-medium text-foreground/80 block">
+                Repository description
+              </label>
+              <div className="flex flex-col gap-3 max-w-xl">
+                <textarea
+                  value={editDesc}
+                  onChange={(e) => setEditDesc(e.target.value)}
+                  rows={3}
+                  className="w-full px-3 py-2 rounded-lg border border-border/50 bg-background text-foreground text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  placeholder="Short description of this project..."
+                />
+                <div>
+                  <button
+                    type="submit"
+                    disabled={updatingDesc}
+                    className="px-4 py-1.5 rounded-lg bg-foreground/10 hover:bg-foreground/20 text-foreground text-xs font-medium transition-colors inline-flex items-center gap-1.5"
+                  >
+                    {updatingDesc && <Loader2 className="size-3 animate-spin" />}
+                    <span>Save Description</span>
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+
+          {/* Section 2: Visibility */}
+          <div className="rounded-xl border border-border/50 bg-foreground/5 p-5 space-y-4">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className="space-y-1">
+                <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                  {currentIsPrivate ? <Lock className="size-4 text-amber-400" /> : <Globe className="size-4 text-emerald-400" />}
+                  Repository Visibility
+                </h4>
+                <p className="text-xs text-foreground/60 max-w-xl">
+                  This repository is currently <span className="font-semibold text-foreground">{currentIsPrivate ? "Private" : "Public"}</span>.{" "}
+                  {currentIsPrivate
+                    ? "Only you and authorized collaborators can clone or push to this repository."
+                    : "Anyone on the internet can see and clone this repository."}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleToggleVisibility}
+                disabled={updatingVisibility}
+                className="px-4 py-1.5 rounded-lg border border-border/60 bg-foreground/10 hover:bg-foreground/20 text-foreground text-xs font-medium transition-colors inline-flex items-center gap-1.5 shrink-0"
+              >
+                {updatingVisibility && <Loader2 className="size-3 animate-spin" />}
+                <span>Make {currentIsPrivate ? "Public" : "Private"}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Section 3: Danger Zone */}
+          <div className="rounded-xl border border-red-500/40 bg-red-500/5 p-5 space-y-6">
+            <div className="flex items-center gap-2 text-red-500 font-semibold text-sm border-b border-red-500/20 pb-3">
+              <ShieldAlert className="size-4" />
+              <span>Danger Zone</span>
+            </div>
+
+            {/* Transfer Ownership */}
+            <form onSubmit={handleTransferOwnership} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-red-500/20 pb-5">
+              <div className="space-y-1">
+                <div className="text-xs font-semibold text-foreground">Transfer ownership</div>
+                <p className="text-[11px] text-foreground/60 max-w-md">
+                  Transfer this repository to another user. You will lose administrative control over this repository.
+                </p>
+                <input
+                  type="text"
+                  value={transferTarget}
+                  onChange={(e) => setTransferTarget(e.target.value)}
+                  placeholder="New owner username..."
+                  className="w-64 px-3 py-1.5 rounded-lg border border-border/50 bg-background text-foreground text-xs font-mono mt-2 focus:outline-none focus:ring-1 focus:ring-red-500"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={transferring || !transferTarget.trim()}
+                className="px-4 py-1.5 rounded-lg border border-red-500/40 text-red-500 hover:bg-red-500 hover:text-white text-xs font-medium transition-all self-start sm:self-end disabled:opacity-40 inline-flex items-center gap-1.5"
+              >
+                {transferring ? <Loader2 className="size-3 animate-spin" /> : <ArrowRightLeft className="size-3" />}
+                <span>Transfer Repository</span>
+              </button>
+            </form>
+
+            {/* Delete this repository */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="text-xs font-semibold text-foreground">Delete this repository</div>
+                <p className="text-[11px] text-foreground/60 max-w-md">
+                  Once deleted, all repository data, files, branches, commits, PRs, and issues will be permanently wiped.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setDeleteConfirmText("");
+                  setDeleteModalOpen(true);
+                }}
+                className="px-4 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-medium transition-colors self-start sm:self-center inline-flex items-center gap-1.5 shrink-0"
+              >
+                <Trash2 className="size-3.5" />
+                <span>Delete this repository</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Safety Confirmation Modal */}
+          {deleteModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-150">
+              <div
+                className="w-full max-w-md rounded-2xl border border-red-500/30 bg-background p-6 shadow-2xl space-y-4 text-foreground animate-in zoom-in-95 duration-150"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center gap-2.5 text-red-500 font-semibold text-base border-b border-border/40 pb-3">
+                  <AlertTriangle className="size-5 shrink-0" />
+                  <h3>Are you absolutely sure?</h3>
+                </div>
+
+                <div className="rounded-lg bg-red-500/10 border border-red-500/30 p-3 text-xs text-foreground/80 leading-relaxed">
+                  This action <span className="font-bold text-red-500">cannot</span> be undone. This will permanently delete the{" "}
+                  <span className="font-mono font-semibold text-foreground">
+                    {ownerUsername}/{currentRepoName}
+                  </span>{" "}
+                  repository, including all files, commit history, pull requests, and issues.
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs text-foreground/70 block">
+                    Please type <span className="font-mono font-semibold text-foreground">{ownerUsername}/{currentRepoName}</span> to confirm:
+                  </label>
+                  <input
+                    type="text"
+                    value={deleteConfirmText}
+                    onChange={(e) => setDeleteConfirmText(e.target.value)}
+                    placeholder={`${ownerUsername}/${currentRepoName}`}
+                    className="w-full px-3 py-2 rounded-lg border border-border/60 bg-foreground/5 text-foreground text-xs font-mono focus:outline-none focus:ring-2 focus:ring-red-500"
+                    autoFocus
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-border/30">
+                  <button
+                    type="button"
+                    onClick={() => setDeleteModalOpen(false)}
+                    className="px-4 py-2 rounded-lg border border-border/50 bg-foreground/5 hover:bg-foreground/10 text-foreground text-xs font-medium transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDeleteRepo}
+                    disabled={deleting || deleteConfirmText.trim() !== `${ownerUsername}/${currentRepoName}`}
+                    className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 disabled:opacity-40 disabled:hover:bg-red-600 text-white text-xs font-semibold transition-all inline-flex items-center gap-1.5"
+                  >
+                    {deleting ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
+                    <span>I understand, delete this repository</span>
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </div>
