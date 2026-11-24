@@ -1295,7 +1295,7 @@ export function RepoFileExplorer({
                       setSelectedPath(path);
                     }
                   }}
-                  label={`${repoName} files`}
+                  label={`${currentRepoName} files`}
                   maxHeight="440px"
                 />
               </div>
