@@ -1,157 +1,166 @@
 "use client";
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { LiquidGlassOrb, type LiquidGlassOrbHandle, type LiquidGlassOrbState } from "@/components/liquid-glass-orb";
-import { Volume2, VolumeX, Copy, Check, Terminal, Sparkles, X } from "lucide-react";
+import { Conversation } from "@elevenlabs/client";
+import {
+  LiquidGlassOrb,
+  type LiquidGlassOrbHandle,
+  type LiquidGlassOrbState,
+} from "@/components/liquid-glass-orb";
 
 export interface ElevenLabsOrbProps {
-  apiKey?: string;
   agentId?: string;
   className?: string;
 }
 
+const STATUS_TEXT: Partial<Record<LiquidGlassOrbState, string>> = {
+  thinking: "Connecting...",
+  listening: "Listening",
+  speaking: "Speaking",
+  searching: "Searching",
+  error: "Mic error",
+};
+
 export function ElevenLabsOrb({
-  apiKey = "sk_73579988aac7e4e1d130566fab67bf2e94f1f6edb6032b14",
   agentId = "cBTYF7NiJbR8Bvmdeuse",
   className = "",
 }: ElevenLabsOrbProps) {
   const [orbState, setOrbState] = useState<LiquidGlassOrbState>("idle");
-  const [audioLevel, setAudioLevel] = useState<number>(0.15);
-  const [isPlaying, setIsPlaying] = useState<boolean>(false);
-  const [showBubble, setShowBubble] = useState<boolean>(false);
-  const [copiedCmd, setCopiedCmd] = useState<string | null>(null);
+  const [isActive, setIsActive] = useState(false);
+  const [statusLabel, setStatusLabel] = useState<string>("");
 
   const orbRef = useRef<LiquidGlassOrbHandle>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const animFrameRef = useRef<number | null>(null);
+  const conversationRef = useRef<Awaited<ReturnType<typeof Conversation.startSession>> | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const modeRef = useRef<"listening" | "speaking">("listening");
 
-  const winCmd = "irm https://velvety-druid-dccd85.netlify.app/install.ps1 | iex";
-  const linuxCmd = "curl -fsSL https://velvety-druid-dccd85.netlify.app/install.sh | bash";
-
-  const copyToClipboard = (cmd: string, id: string) => {
-    navigator.clipboard.writeText(cmd);
-    setCopiedCmd(id);
-    setTimeout(() => setCopiedCmd(null), 2000);
-  };
-
-  const stopAudio = useCallback(() => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
+  const stopVolumeLoop = useCallback(() => {
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
     }
-    if (animFrameRef.current) {
-      cancelAnimationFrame(animFrameRef.current);
-      animFrameRef.current = null;
-    }
-    setIsPlaying(false);
-    setOrbState("idle");
-    setAudioLevel(0.15);
-    orbRef.current?.setAudioLevel(0.15);
   }, []);
 
-  const startVoice = async () => {
+  const startVolumeLoop = useCallback(() => {
+    stopVolumeLoop();
+    const tick = () => {
+      const conv = conversationRef.current;
+      if (conv) {
+        const raw =
+          modeRef.current === "speaking" ? conv.getOutputVolume() : conv.getInputVolume();
+        const level = Math.min(1, Math.max(0.12, raw * 1.4));
+        orbRef.current?.setAudioLevel(level);
+      }
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+  }, [stopVolumeLoop]);
+
+  const endConversation = useCallback(async () => {
+    stopVolumeLoop();
+    const conv = conversationRef.current;
+    conversationRef.current = null;
+    setIsActive(false);
+    setOrbState("idle");
+    setStatusLabel("");
+    orbRef.current?.setAudioLevel(0.15);
+    if (conv) {
+      try {
+        await conv.endSession();
+      } catch {
+        // Ignore cleanup errors if already closed
+      }
+    }
+  }, [stopVolumeLoop]);
+
+  const startConversation = async () => {
     try {
+      setIsActive(true);
       setOrbState("thinking");
-      setShowBubble(true);
+      setStatusLabel("Connecting...");
 
-      // Lazy initialize AudioContext & audio element
-      if (!audioRef.current) {
-        const audio = new Audio("/mygit_agent_speech.mp3");
-        audio.crossOrigin = "anonymous";
-        audioRef.current = audio;
+      const conversation = await Conversation.startSession({
+        agentId,
+        connectionType: "websocket",
+        onConnect: () => {
+          modeRef.current = "listening";
+          setOrbState("listening");
+          setStatusLabel("Listening");
+          startVolumeLoop();
+        },
+        onDisconnect: () => {
+          stopVolumeLoop();
+          conversationRef.current = null;
+          setIsActive(false);
+          setOrbState("idle");
+          setStatusLabel("");
+          orbRef.current?.setAudioLevel(0.15);
+        },
+        onModeChange: ({ mode }) => {
+          modeRef.current = mode === "speaking" ? "speaking" : "listening";
+          const nextState: LiquidGlassOrbState =
+            mode === "speaking" ? "speaking" : "listening";
+          setOrbState(nextState);
+          setStatusLabel(STATUS_TEXT[nextState] ?? "");
+        },
+        onError: (message) => {
+          console.error("ElevenLabs conversation error:", message);
+          stopVolumeLoop();
+          conversationRef.current = null;
+          setIsActive(false);
+          setOrbState("error");
+          setStatusLabel("Error");
+          setTimeout(() => {
+            setOrbState("idle");
+            setStatusLabel("");
+          }, 2500);
+        },
+      });
 
-        audio.onended = () => {
-          stopAudio();
-          setTimeout(() => setShowBubble(false), 3000);
-        };
-      }
-
-      if (!audioCtxRef.current) {
-        const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-        const ctx = new AudioContextClass();
-        const analyser = ctx.createAnalyser();
-        analyser.fftSize = 128;
-        analyser.smoothingTimeConstant = 0.8;
-
-        const source = ctx.createMediaElementSource(audioRef.current);
-        source.connect(analyser);
-        analyser.connect(ctx.destination);
-
-        audioCtxRef.current = ctx;
-        analyserRef.current = analyser;
-      }
-
-      if (audioCtxRef.current.state === "suspended") {
-        await audioCtxRef.current.resume();
-      }
-
-      await audioRef.current.play();
-      setIsPlaying(true);
-      setOrbState("speaking");
-
-      // Real-time audio waveform visualizer loop driving the LiquidGlassOrb
-      const analyser = analyserRef.current;
-      if (analyser) {
-        const bufferLength = analyser.frequencyBinCount;
-        const dataArray = new Uint8Array(bufferLength);
-
-        const updateMeter = () => {
-          analyser.getByteFrequencyData(dataArray);
-          let sum = 0;
-          for (let i = 0; i < bufferLength; i++) {
-            sum += dataArray[i];
-          }
-          const average = sum / bufferLength;
-          // Normalize to 0.1 .. 0.95 range for vivid liquid orb waves
-          const normalized = Math.min(1.0, Math.max(0.1, average / 128.0));
-          setAudioLevel(normalized);
-          orbRef.current?.setAudioLevel(normalized);
-
-          animFrameRef.current = requestAnimationFrame(updateMeter);
-        };
-        updateMeter();
-      }
+      conversationRef.current = conversation;
     } catch (err) {
-      console.error("ElevenLabs audio play error:", err);
-      stopAudio();
+      console.error("Failed to start ElevenLabs session:", err);
+      stopVolumeLoop();
+      conversationRef.current = null;
+      setIsActive(false);
+      setOrbState("error");
+      setStatusLabel("Mic blocked");
+      setTimeout(() => {
+        setOrbState("idle");
+        setStatusLabel("");
+      }, 2500);
     }
   };
 
-  const toggleVoice = () => {
-    if (isPlaying) {
-      stopAudio();
+  const handleClick = () => {
+    if (isActive || conversationRef.current) {
+      void endConversation();
     } else {
-      startVoice();
+      void startConversation();
     }
   };
 
   useEffect(() => {
     return () => {
-      stopAudio();
-      if (audioCtxRef.current && audioCtxRef.current.state !== "closed") {
-        audioCtxRef.current.close().catch(() => {});
-      }
+      void endConversation();
     };
-  }, [stopAudio]);
+  }, [endConversation]);
 
   return (
-    <div className={`relative inline-flex items-center ${className}`}>
-      {/* Orb Trigger Button */}
+    <div className={`inline-flex items-center gap-2.5 ${className}`}>
+      {statusLabel && (
+        <span className="text-xs font-medium text-neutral-600 dark:text-neutral-400 select-none whitespace-nowrap">
+          {statusLabel}
+        </span>
+      )}
+
       <button
         type="button"
-        onClick={toggleVoice}
-        className="relative group p-0.5 rounded-full cursor-pointer focus:outline-hidden hover:scale-105 active:scale-95 transition-all select-none"
-        title={isPlaying ? "Mute ElevenLabs Voice Agent" : "Listen to mygit Voice Agent (ElevenLabs)"}
-        aria-label="ElevenLabs AI Voice Assistant"
+        onClick={handleClick}
+        className="relative p-0.5 rounded-full cursor-pointer focus:outline-hidden hover:scale-105 active:scale-95 transition-transform select-none"
+        title={isActive ? "Click to end voice conversation" : "Click to talk with mygit AI"}
+        aria-label={isActive ? `Voice assistant: ${statusLabel || orbState}` : "Start voice conversation"}
       >
-        <div
-          className={`relative w-9 h-9 sm:w-9.5 sm:h-9.5 rounded-full overflow-hidden flex items-center justify-center shadow-xs transition-all ${
-            isPlaying
-              ? "ring-2 ring-[#c8ff29] dark:ring-[#b8ff3c] shadow-[0_0_15px_rgba(184,255,60,0.4)]"
-              : "border border-neutral-300/80 dark:border-neutral-700/80 hover:border-neutral-400 dark:hover:border-neutral-600"
-          } bg-neutral-950 shrink-0`}
-        >
+        <div className="relative w-9 h-9 sm:w-9.5 sm:h-9.5 rounded-full overflow-hidden flex items-center justify-center bg-neutral-950 shrink-0">
           <LiquidGlassOrb
             ref={orbRef}
             baseColor="#ffffff"
@@ -188,135 +197,12 @@ export function ElevenLabsOrb({
             preserveWhites={true}
             animateEntrance={true}
             size={38}
-            audioLevel={audioLevel}
+            audioLevel={0.15}
             className="!w-full !h-full"
             style={{ width: "100%", height: "100%" }}
           />
-
-          {/* Center Voice Icon Indicator when playing */}
-          {isPlaying && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none bg-black/20 backdrop-blur-[0.5px]">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#b8ff3c] opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-[#c8ff29]"></span>
-              </span>
-            </div>
-          )}
         </div>
       </button>
-
-      {/* Floating Interactive Speech Popover */}
-      {showBubble && (
-        <div className="absolute right-0 top-12 z-50 w-[310px] sm:w-[350px] p-3.5 rounded-2xl bg-white/95 dark:bg-neutral-900/95 backdrop-blur-xl border border-neutral-200/90 dark:border-neutral-800/90 shadow-2xl text-left animate-in fade-in zoom-in-95 duration-200">
-          <div className="flex items-center justify-between pb-2 mb-2 border-b border-neutral-100 dark:border-neutral-800">
-            <div className="flex items-center gap-1.5">
-              <Sparkles className="w-4 h-4 text-[#7db510] dark:text-[#b8ff3c]" />
-              <span className="text-xs font-bold text-neutral-950 dark:text-white tracking-tight">
-                mygit AI Voice Assistant
-              </span>
-              <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded-full bg-[#c8ff29]/20 dark:bg-[#b8ff3c]/20 text-[#608d0a] dark:text-[#b8ff3c] font-semibold">
-                ElevenLabs
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowBubble(false)}
-              className="p-1 rounded-md text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 cursor-pointer"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          <p className="text-xs text-neutral-700 dark:text-neutral-300 leading-relaxed mb-3">
-            {isPlaying
-              ? "Speaking about mygit byte compatibility, parallel packfile indexing, and how to install the CLI directly on your laptop..."
-              : "Click the orb anytime to listen to the overview and quick installation commands."}
-          </p>
-
-          <div className="space-y-2">
-            {/* Windows Command */}
-            <div className="flex flex-col gap-1 p-2 rounded-xl bg-neutral-100/80 dark:bg-neutral-800/60 border border-neutral-200/60 dark:border-neutral-700/60">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
-                  Windows PowerShell
-                </span>
-                <button
-                  type="button"
-                  onClick={() => copyToClipboard(winCmd, "win")}
-                  className="flex items-center gap-1 text-[10px] font-medium text-neutral-500 hover:text-neutral-900 dark:hover:text-white cursor-pointer"
-                >
-                  {copiedCmd === "win" ? (
-                    <>
-                      <Check className="w-3 h-3 text-emerald-500" />
-                      <span className="text-emerald-500 font-bold">Copied</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3 h-3" />
-                      <span>Copy</span>
-                    </>
-                  )}
-                </button>
-              </div>
-              <code className="text-[10px] font-mono text-neutral-900 dark:text-neutral-100 truncate select-all bg-white/70 dark:bg-neutral-950/70 p-1.5 rounded-md border border-neutral-200/50 dark:border-neutral-800/50">
-                {winCmd}
-              </code>
-            </div>
-
-            {/* Linux / macOS Command */}
-            <div className="flex flex-col gap-1 p-2 rounded-xl bg-neutral-100/80 dark:bg-neutral-800/60 border border-neutral-200/60 dark:border-neutral-700/60">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
-                  Linux & macOS
-                </span>
-                <button
-                  type="button"
-                  onClick={() => copyToClipboard(linuxCmd, "linux")}
-                  className="flex items-center gap-1 text-[10px] font-medium text-neutral-500 hover:text-neutral-900 dark:hover:text-white cursor-pointer"
-                >
-                  {copiedCmd === "linux" ? (
-                    <>
-                      <Check className="w-3 h-3 text-emerald-500" />
-                      <span className="text-emerald-500 font-bold">Copied</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3 h-3" />
-                      <span>Copy</span>
-                    </>
-                  )}
-                </button>
-              </div>
-              <code className="text-[10px] font-mono text-neutral-900 dark:text-neutral-100 truncate select-all bg-white/70 dark:bg-neutral-950/70 p-1.5 rounded-md border border-neutral-200/50 dark:border-neutral-800/50">
-                {linuxCmd}
-              </code>
-            </div>
-          </div>
-
-          <div className="mt-3 flex items-center justify-between pt-2 border-t border-neutral-100 dark:border-neutral-800 text-[11px]">
-            <button
-              type="button"
-              onClick={toggleVoice}
-              className="flex items-center gap-1.5 font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white cursor-pointer"
-            >
-              {isPlaying ? (
-                <>
-                  <VolumeX className="w-3.5 h-3.5 text-rose-500" />
-                  <span className="text-rose-500 font-bold">Stop Voice</span>
-                </>
-              ) : (
-                <>
-                  <Volume2 className="w-3.5 h-3.5 text-[#7db510] dark:text-[#b8ff3c]" />
-                  <span>Play Intro Again</span>
-                </>
-              )}
-            </button>
-            <span className="text-[10px] text-neutral-400 font-mono">
-              Agent: {agentId.slice(0, 8)}...
-            </span>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
