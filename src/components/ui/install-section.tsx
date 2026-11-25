@@ -214,9 +214,17 @@ export function InstallSection() {
 
             <div>
               <span className="text-[#b8ff3c]">dev@mygit</span> <span className="text-purple-400">~</span><br />
-              <span className="text-neutral-500">$</span> <span className="text-white font-medium">mygit repo create my-app --init &amp;&amp; cd my-app</span>
+              <span className="text-neutral-500">$</span> <span className="text-white font-medium">mkdir my-app &amp;&amp; cd my-app &amp;&amp; mygit init</span>
               <div className="text-neutral-400 text-[11px] mt-0.5 pl-3 border-l border-neutral-800">
-                ✓ Registered repository &apos;omraut/my-app&apos; &amp; configured origin
+                Initialized empty mygit repository in ~/my-app/.mygit/
+              </div>
+            </div>
+
+            <div>
+              <span className="text-[#b8ff3c]">dev@mygit</span> <span className="text-purple-400">~/my-app</span> <span className="text-cyan-400">(main)</span><br />
+              <span className="text-neutral-500">$</span> <span className="text-white font-medium">mygit remote add origin https://mygit-backend-y27o.onrender.com/api/repos/my-app</span>
+              <div className="text-neutral-400 text-[11px] mt-0.5 pl-3 border-l border-neutral-800">
+                ✓ Linked remote &apos;origin&apos; (or use <span className="text-neutral-200">mygit repo create my-app --init</span>)
               </div>
             </div>
 
