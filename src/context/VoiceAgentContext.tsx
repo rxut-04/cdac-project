@@ -328,7 +328,7 @@ function VoiceAgentProviderInner({ children }: { children: React.ReactNode }) {
       setErrorMessage(null);
       try {
         conversation.sendContextualUpdate(
-          "The user is on mygit — a byte-compatible distributed Git platform. If they ask how to install mygit, tell them Windows PowerShell: irm https://velvety-druid-dccd85.netlify.app/install.ps1 | iex, or Linux/macOS: curl -fsSL https://velvety-druid-dccd85.netlify.app/install.sh | bash. Keep your tone calm, warm, and energetic.",
+          "The user is on mygit — a byte-compatible distributed Git platform. If they ask how to install mygit, tell them Windows PowerShell: irm https://the-only-git-platform-you-need.netlify.app/install.ps1 | iex, or Linux/macOS: curl -fsSL https://the-only-git-platform-you-need.netlify.app/install.sh | bash. Keep your tone calm, warm, and energetic.",
         );
       } catch {
         // Ignore if contextual update isn't ready

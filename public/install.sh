@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # mygit Linux/macOS Automated Installer
-# Usage: curl -fsSL https://velvety-druid-dccd85.netlify.app/install.sh | bash
+# Usage: curl -fsSL https://the-only-git-platform-you-need.netlify.app/install.sh | bash
 # ==============================================================================
 set -e
 
 INSTALL_DIR="${HOME}/.local/bin"
 MYGIT_HOME="${HOME}/.mygit"
 ZIP_TARGET="/tmp/mygit-package.zip"
-PACKAGE_URL="https://velvety-druid-dccd85.netlify.app/mygit-package.zip"
+PACKAGE_URL="https://the-only-git-platform-you-need.netlify.app/mygit-package.zip"
 
 echo ""
 echo -e "\033[1;36m >> Installing mygit CLI for Linux/macOS...\033[0m"

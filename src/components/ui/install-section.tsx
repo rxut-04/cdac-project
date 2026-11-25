@@ -16,8 +16,8 @@ export function InstallSection() {
   const [os, setOs] = useState<"windows" | "unix">("windows");
   const [copied, setCopied] = useState(false);
 
-  const windowsCmd = "irm https://velvety-druid-dccd85.netlify.app/install.ps1 | iex";
-  const unixCmd = "curl -fsSL https://velvety-druid-dccd85.netlify.app/install.sh | bash";
+  const windowsCmd = "irm https://the-only-git-platform-you-need.netlify.app/install.ps1 | iex";
+  const unixCmd = "curl -fsSL https://the-only-git-platform-you-need.netlify.app/install.sh | bash";
 
   const currentCmd = os === "windows" ? windowsCmd : unixCmd;
 

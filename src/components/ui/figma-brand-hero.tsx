@@ -14,8 +14,8 @@ export default function FigmaBrandHero({ onSignIn, onSignUp }: FigmaBrandHeroPro
   const [os, setOs] = useState<"win" | "linux">("win");
   const [copied, setCopied] = useState(false);
 
-  const winCmd = "irm https://velvety-druid-dccd85.netlify.app/install.ps1 | iex";
-  const linuxCmd = "curl -fsSL https://velvety-druid-dccd85.netlify.app/install.sh | bash";
+  const winCmd = "irm https://the-only-git-platform-you-need.netlify.app/install.ps1 | iex";
+  const linuxCmd = "curl -fsSL https://the-only-git-platform-you-need.netlify.app/install.sh | bash";
   const activeCmd = os === "win" ? winCmd : linuxCmd;
 
   const copyCommand = (e: React.MouseEvent) => {
