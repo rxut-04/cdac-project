@@ -196,41 +196,43 @@ export function InstallSection() {
               <div className="size-2 rounded-full bg-neutral-700" />
               <div className="size-2 rounded-full bg-neutral-700" />
               <div className="size-2 rounded-full bg-neutral-700" />
-              <span className="text-[11px] text-neutral-500 ml-2 font-sans font-medium">terminal preview</span>
+              <span className="text-[11px] text-neutral-500 ml-2 font-sans font-medium">mygit Bash · first-time quick start</span>
             </div>
-            <span className="text-[10px] text-neutral-500 font-mono">mygit v0.1.0</span>
+            <span className="text-[10px] text-[#b8ff3c] font-mono">mygit v1.0.0</span>
           </div>
 
           <div className="space-y-3 text-[11px] sm:text-xs">
             <div>
-              <span className="text-neutral-500">PS C:\&gt;</span> <span className="text-white font-medium">mygit</span>
-              <div className="text-neutral-400 text-[11px] mt-1 pl-3 border-l border-neutral-800 space-y-0.5">
-                <div className="text-cyan-400 font-semibold">Welcome to the mygit Dedicated Shell</div>
-                <div className="text-neutral-300">Created by: Om Raut (CDAC Pass Out Student)</div>
-                <div className="text-neutral-500">Type &apos;help&apos; to list commands or &apos;exit&apos; to quit.</div>
-              </div>
-            </div>
-
-            <div>
-              <span className="text-neutral-500">PS C:\&gt;</span> <span className="text-white font-medium">mygit login</span>
+              <span className="text-[#b8ff3c]">dev@mygit</span> <span className="text-purple-400">~</span><br />
+              <span className="text-neutral-500">$</span> <span className="text-white font-medium">mygit login</span>
               <div className="text-neutral-400 text-[11px] mt-0.5 pl-3 border-l border-neutral-800">
-                Email: oraut860@gmail.com<br />
-                Password: ••••••••<br />
-                <span className="text-neutral-300">✓ Authenticated as 'omraut' (User ID: 4)</span>
+                Email or Personal Access Token: oraut860@gmail.com<br />
+                Password or Personal Access Token (PAT): ••••••••<br />
+                <span className="text-emerald-400">✓ Authenticated as &apos;omraut&apos; (saved for future pushes)</span>
               </div>
             </div>
 
             <div>
-              <span className="text-neutral-500">PS C:\&gt;</span> <span className="text-white font-medium">mygit init my-app</span>
+              <span className="text-[#b8ff3c]">dev@mygit</span> <span className="text-purple-400">~</span><br />
+              <span className="text-neutral-500">$</span> <span className="text-white font-medium">mygit repo create my-app --init &amp;&amp; cd my-app</span>
               <div className="text-neutral-400 text-[11px] mt-0.5 pl-3 border-l border-neutral-800">
-                Initialized empty mygit repository in C:\my-app\.mygit\
+                ✓ Registered repository &apos;omraut/my-app&apos; &amp; configured origin
               </div>
             </div>
 
             <div>
-              <span className="text-neutral-500">PS C:\my-app&gt;</span> <span className="text-white font-medium">mygit add . && mygit commit -m "Initial commit"</span>
+              <span className="text-[#b8ff3c]">dev@mygit</span> <span className="text-purple-400">~/my-app</span> <span className="text-cyan-400">(main)</span><br />
+              <span className="text-neutral-500">$</span> <span className="text-white font-medium">mygit add . &amp;&amp; mygit commit -m &quot;Initial commit&quot;</span>
               <div className="text-neutral-400 text-[11px] mt-0.5 pl-3 border-l border-neutral-800">
                 [main (root-commit) 4a8b1c9] Initial commit (2 files changed, 48 insertions)
+              </div>
+            </div>
+
+            <div>
+              <span className="text-[#b8ff3c]">dev@mygit</span> <span className="text-purple-400">~/my-app</span> <span className="text-cyan-400">(main)</span><br />
+              <span className="text-neutral-500">$</span> <span className="text-white font-medium">mygit push origin main</span>
+              <div className="text-neutral-400 text-[11px] mt-0.5 pl-3 border-l border-neutral-800">
+                <span className="text-emerald-400">✓ Successfully pushed to &apos;origin&apos;</span>
               </div>
             </div>
           </div>
