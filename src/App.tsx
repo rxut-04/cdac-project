@@ -3,11 +3,12 @@ import { AuthenticateWithRedirectCallback, useUser, useClerk } from "@clerk/reac
 import DemoOne from "@/components/ui/demo";
 import { SmokeLogin } from "@/components/ui/smoke-login";
 import { DashboardPage } from "@/components/ui/dashboard-page";
+import { VoiceAgentProvider } from "@/context/VoiceAgentContext";
 import { authApi } from "@/lib/api";
 
 type Page = "home" | "login" | "signup" | "dashboard";
 
-export default function App() {
+function AppContent() {
   const { isSignedIn, user, isLoaded } = useUser();
   const { signOut } = useClerk();
   const [userEmail, setUserEmail] = useState(() => {
@@ -152,5 +153,13 @@ export default function App() {
       onSignUp={() => navigate("signup")}
       onDashboard={() => navigate("dashboard")}
     />
+  );
+}
+
+export default function App() {
+  return (
+    <VoiceAgentProvider>
+      <AppContent />
+    </VoiceAgentProvider>
   );
 }
