@@ -150,4 +150,12 @@ export const repoApi = {
     const res = await api.post<RepositoryItem>(`/repos/${encodeURIComponent(name)}/transfer`, { newOwnerUsername });
     return res.data;
   },
+
+  upsertFile: async (
+    name: string,
+    payload: { path: string; content: string; branch?: string; message?: string }
+  ): Promise<{ path: string; branch: string; commitSha: string; blobSha: string }> => {
+    const res = await api.post(`/repos/${encodeURIComponent(name)}/files`, payload);
+    return res.data;
+  },
 };

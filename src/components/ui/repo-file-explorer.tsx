@@ -44,6 +44,8 @@ import {
   ArrowRightLeft,
   Loader2,
   AlertTriangle,
+  Pencil,
+  X,
 } from "lucide-react";
 
 export interface RepoFileExplorerProps {
@@ -393,6 +395,13 @@ export function RepoFileExplorer({
   const [files, setFiles] = useState<RepoFile[]>(initialFiles);
   const [selectedPath, setSelectedPath] = useState<string>("README.md");
   const [searchQuery, setSearchQuery] = useState("");
+
+  // In-browser file editor states
+  const [fileEditorOpen, setFileEditorOpen] = useState(false);
+  const [editorPath, setEditorPath] = useState("");
+  const [editorContent, setEditorContent] = useState("");
+  const [editorMessage, setEditorMessage] = useState("");
+  const [savingFile, setSavingFile] = useState(false);
 
   // Navigation Tabs: "code" | "commits" | "pulls" | "issues" | "settings"
   const [activeTab, setActiveTab] = useState<"code" | "commits" | "pulls" | "issues" | "settings">("code");
@@ -827,6 +836,43 @@ export function RepoFileExplorer({
         alert(err.response?.data?.error || "Failed to create issue");
       })
       .finally(() => setIssueSubmitting(false));
+  };
+
+  const handleSaveWebFile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanPath = editorPath.trim().replace(/^\/+/, "");
+    if (!cleanPath) return;
+    setSavingFile(true);
+    try {
+      await repoApi.upsertFile(currentRepoName, {
+        path: cleanPath,
+        content: editorContent,
+        branch: currentBranch,
+        message: editorMessage.trim() || `Update ${cleanPath}`,
+      });
+      setFiles((prev) => {
+        const idx = prev.findIndex((f) => f.path === cleanPath);
+        const updated: RepoFile = {
+          path: cleanPath,
+          code: editorContent,
+          status: idx >= 0 ? "M" : "A",
+          additions: editorContent.split("\n").length,
+          deletions: 0,
+        };
+        if (idx >= 0) {
+          const copy = [...prev];
+          copy[idx] = updated;
+          return copy;
+        }
+        return [...prev, updated];
+      });
+      setSelectedPath(cleanPath);
+      setFileEditorOpen(false);
+    } catch (err: any) {
+      alert(err?.response?.data?.error || "Failed to save file");
+    } finally {
+      setSavingFile(false);
+    }
   };
 
   // Toggle Issue Status (Open <-> Closed)
@@ -1309,6 +1355,41 @@ export function RepoFileExplorer({
 
             {/* Right Side: CodeBlock Viewer */}
             <div className="flex flex-col min-w-0 rounded-xl overflow-hidden border border-border/50 bg-foreground/5 shadow-sm">
+              <div className="px-3 py-2 border-b border-border/40 bg-foreground/5 flex items-center justify-between gap-2">
+                <span className="text-xs font-mono text-foreground/70 truncate">
+                  {selectedFile ? selectedFile.path : "No file selected"}
+                </span>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditorPath("");
+                      setEditorContent("");
+                      setEditorMessage("");
+                      setFileEditorOpen(true);
+                    }}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-border/60 bg-background hover:bg-foreground/10 text-xs font-medium text-foreground cursor-pointer transition-colors"
+                  >
+                    <Plus className="size-3" />
+                    <span>New File</span>
+                  </button>
+                  {selectedFile && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditorPath(selectedFile.path);
+                        setEditorContent(selectedFile.code);
+                        setEditorMessage(`Update ${selectedFile.path}`);
+                        setFileEditorOpen(true);
+                      }}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-border/60 bg-background hover:bg-foreground/10 text-xs font-medium text-foreground cursor-pointer transition-colors"
+                    >
+                      <Pencil className="size-3" />
+                      <span>Edit</span>
+                    </button>
+                  )}
+                </div>
+              </div>
               <CodeBlock
                 className="w-full h-full min-h-[500px]"
                 filename={selectedFile ? selectedFile.path : "README.md"}
@@ -1319,6 +1400,87 @@ export function RepoFileExplorer({
               />
             </div>
           </div>
+
+          {/* In-Browser File Editor Modal */}
+          {fileEditorOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+              <form
+                onSubmit={handleSaveWebFile}
+                className="w-full max-w-2xl rounded-2xl border border-border bg-background text-foreground shadow-2xl overflow-hidden"
+              >
+                <div className="flex items-center justify-between px-5 py-3.5 border-b border-border/60">
+                  <span className="text-sm font-bold flex items-center gap-2">
+                    <FileText className="size-4 text-emerald-500" />
+                    <span>{editorPath ? `Edit ${editorPath}` : "Create New File"}</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setFileEditorOpen(false)}
+                    className="p-1 rounded-md text-foreground/60 hover:text-foreground cursor-pointer"
+                  >
+                    <X className="size-4" />
+                  </button>
+                </div>
+
+                <div className="p-5 space-y-3.5">
+                  <div>
+                    <label className="block text-xs font-mono text-foreground/70 mb-1">
+                      File path (e.g. src/main.py or README.md)
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={editorPath}
+                      onChange={(e) => setEditorPath(e.target.value)}
+                      placeholder="src/app.py"
+                      className="w-full px-3 py-2 rounded-lg border border-border bg-foreground/5 text-xs font-mono outline-none focus:ring-2 focus:ring-emerald-500/40"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-mono text-foreground/70 mb-1">
+                      Content
+                    </label>
+                    <textarea
+                      rows={12}
+                      value={editorContent}
+                      onChange={(e) => setEditorContent(e.target.value)}
+                      placeholder="Write file contents..."
+                      className="w-full px-3 py-2 rounded-lg border border-border bg-foreground/5 text-xs font-mono outline-none focus:ring-2 focus:ring-emerald-500/40 resize-y"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-mono text-foreground/70 mb-1">
+                      Commit message
+                    </label>
+                    <input
+                      type="text"
+                      value={editorMessage}
+                      onChange={(e) => setEditorMessage(e.target.value)}
+                      placeholder="Update file via web editor"
+                      className="w-full px-3 py-2 rounded-lg border border-border bg-foreground/5 text-xs outline-none focus:ring-2 focus:ring-emerald-500/40"
+                    />
+                  </div>
+                </div>
+
+                <div className="px-5 py-3.5 border-t border-border/60 flex items-center justify-end gap-2 bg-foreground/5">
+                  <button
+                    type="button"
+                    onClick={() => setFileEditorOpen(false)}
+                    className="px-3.5 py-1.5 rounded-lg border border-border text-xs font-medium hover:bg-foreground/10 cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={savingFile}
+                    className="px-4 py-1.5 rounded-lg bg-[#c8ff29] dark:bg-[#b8ff3c] text-neutral-950 text-xs font-bold hover:opacity-90 disabled:opacity-50 cursor-pointer"
+                  >
+                    {savingFile ? "Committing..." : "Commit Changes"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
 
           {/* Automatic README Section */}
           {readmeFile && (

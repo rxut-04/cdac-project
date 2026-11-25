@@ -3,6 +3,7 @@ import { AuthenticateWithRedirectCallback, useUser, useClerk } from "@clerk/reac
 import DemoOne from "@/components/ui/demo";
 import { SmokeLogin } from "@/components/ui/smoke-login";
 import { DashboardPage } from "@/components/ui/dashboard-page";
+import { CommandPalette } from "@/components/ui/command-palette";
 import { VoiceAgentProvider } from "@/context/VoiceAgentContext";
 import { authApi } from "@/lib/api";
 
@@ -159,6 +160,15 @@ function AppContent() {
 export default function App() {
   return (
     <VoiceAgentProvider>
+      <CommandPalette
+        onNavigateHome={() => {
+          window.history.pushState(null, "", window.location.pathname);
+          window.dispatchEvent(new HashChangeEvent("hashchange"));
+        }}
+        onNavigateDashboard={() => {
+          window.location.hash = "dashboard";
+        }}
+      />
       <AppContent />
     </VoiceAgentProvider>
   );
