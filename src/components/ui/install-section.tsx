@@ -118,6 +118,38 @@ export function InstallSection() {
           </div>
         </div>
 
+        {/* Dedicated mygit Bash Desktop Terminal Downloads */}
+        <div className="mt-5 pt-5 border-t border-neutral-200/80 dark:border-neutral-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h3 className="text-xs sm:text-sm font-bold text-neutral-900 dark:text-white flex items-center gap-2">
+              <Terminal className="size-3.5 text-[#7db510] dark:text-[#b8ff3c]" />
+              <span>Download mygit Bash Desktop Terminal</span>
+            </h3>
+            <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5">
+              Standalone Go + Wails terminal with built-in POSIX shell &amp; live Git branch prompt.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <a
+              href="/downloads/mygit-bash_1.0.0_amd64.deb"
+              download="mygit-bash_1.0.0_amd64.deb"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-neutral-900 dark:bg-white text-white dark:text-neutral-950 hover:opacity-90 transition-opacity shadow-xs"
+            >
+              <Download className="size-3.5" />
+              <span>Linux (.deb)</span>
+            </a>
+            <a
+              href="https://github.com/rxut-04/cdac-project/releases/latest/download/mygit-bash-amd64-installer.exe"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-[#c8ff29] dark:bg-[#b8ff3c] text-neutral-950 hover:opacity-90 transition-opacity shadow-xs border border-neutral-900/10"
+            >
+              <Download className="size-3.5" />
+              <span>Windows (.exe)</span>
+            </a>
+          </div>
+        </div>
+
         {/* Minimalist Feature Points */}
         <div className="mt-6 pt-5 border-t border-neutral-200/80 dark:border-neutral-800/80 grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="flex items-start gap-3 p-3 rounded-xl bg-neutral-50/70 dark:bg-neutral-900/40 border border-neutral-200/60 dark:border-neutral-800/60">
