@@ -231,7 +231,7 @@ export default function DemoOne({
         {/* Right Action: ElevenLabs Voice Orb AI & Theme Toggle (Right Only) */}
         <div className="flex flex-1 items-center justify-end gap-2.5">
           {/* ElevenLabs Voice Orb */}
-          <ElevenLabsOrb agentId="cBTYF7NiJbR8Bvmdeuse" />
+          <ElevenLabsOrb voiceId="cBTYF7NiJbR8Bvmdeuse" />
 
           {/* Light / Dark Mode Toggle */}
           <button
