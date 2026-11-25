@@ -139,9 +139,8 @@ export function InstallSection() {
               <span>Linux (.deb)</span>
             </a>
             <a
-              href="https://github.com/rxut-04/cdac-project/releases/latest/download/mygit-bash-amd64-installer.exe"
-              target="_blank"
-              rel="noreferrer"
+              href="/downloads/mygit-bash.exe"
+              download="mygit-bash.exe"
               className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-[#c8ff29] dark:bg-[#b8ff3c] text-neutral-950 hover:opacity-90 transition-opacity shadow-xs border border-neutral-900/10"
             >
               <Download className="size-3.5" />
