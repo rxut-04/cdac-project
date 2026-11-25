@@ -12,51 +12,72 @@ export interface ElevenLabsOrbProps {
   className?: string;
 }
 
-interface SpeechRecognitionEventLike {
-  results: {
-    [index: number]: {
-      isFinal: boolean;
-      [index: number]: { transcript: string };
-    };
-    length: number;
-  };
-}
-
-interface SpeechRecognitionLike {
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
-  onerror: ((event: { error: string }) => void) | null;
-  onend: (() => void) | null;
-  start: () => void;
-  stop: () => void;
-  abort: () => void;
-}
-
 function buildReply(userText: string): string {
   const q = userText.toLowerCase();
 
-  if (q.includes("install") || q.includes("windows") || q.includes("linux") || q.includes("mac") || q.includes("setup")) {
-    return "To install mygit on Windows PowerShell, run: irm https://velvety-druid-dccd85.netlify.app/install.ps1 | iex. On Linux or macOS, run: curl -fsSL https://velvety-druid-dccd85.netlify.app/install.sh | bash.";
+  if (
+    q.includes("install") ||
+    q.includes("windows") ||
+    q.includes("linux") ||
+    q.includes("mac") ||
+    q.includes("setup") ||
+    q.includes("command")
+  ) {
+    return "Super easy! On Windows PowerShell, run: irm https://velvety-druid-dccd85.netlify.app/install.ps1 | iex. Or on Linux and Mac, run: curl -fsSL https://velvety-druid-dccd85.netlify.app/install.sh | bash. You'll be ready in seconds!";
   }
-  if (q.includes("login") || q.includes("google") || q.includes("token") || q.includes("auth")) {
-    return "Run mygit login in your terminal and enter your email and password. If you signed in with Google on the web, generate a Personal Access Token from your dashboard and use mygit login with your token. You only need to log in once per machine.";
+  if (
+    q.includes("login") ||
+    q.includes("google") ||
+    q.includes("token") ||
+    q.includes("auth")
+  ) {
+    return "Just run mygit login in your terminal and enter your email and password! If you signed in with Google on the web, grab a Personal Access Token from your dashboard and paste it into mygit login. Once logged in, you're set for every repo.";
   }
   if (q.includes("push") || q.includes("repo") || q.includes("create")) {
-    return "First create your repository from the mygit dashboard, then run mygit remote add origin followed by your repository URL, and push with mygit push origin main.";
+    return "First, create your repository right from the mygit dashboard. Then link your remote with mygit remote add origin, and push cleanly using mygit push origin main!";
   }
-  if (q.includes("pull request") || q.includes("pr") || q.includes("issue") || q.includes("merge")) {
-    return "mygit supports branches, three-way merge with lowest common ancestor conflict detection, pull requests, and issue tracking directly from your repository dashboard.";
+  if (
+    q.includes("pull request") ||
+    q.includes("pr") ||
+    q.includes("issue") ||
+    q.includes("merge")
+  ) {
+    return "mygit handles branches, three-way merges with lowest common ancestor conflict detection, pull requests, and issue tracking — all synced seamlessly with your dashboard!";
   }
-  if (q.includes("what is") || q.includes("about") || q.includes("platform") || q.includes("mygit")) {
-    return "mygit is a byte-compatible distributed Git platform. It stores standard SHA-1 blobs, trees, and commits that work with genuine Git tools, paired with an interactive REPL shell and web dashboard.";
+  if (
+    q.includes("what is") ||
+    q.includes("about") ||
+    q.includes("platform") ||
+    q.includes("mygit")
+  ) {
+    return "mygit is a byte-compatible distributed Git platform built for speed and clarity. Every SHA-1 blob, tree, and commit works with real Git tools, paired with an interactive REPL shell and modern web dashboard.";
   }
-  if (q.includes("bye") || q.includes("stop") || q.includes("exit") || q.includes("thanks") || q.includes("thank you")) {
-    return "Happy coding! Click the orb anytime if you need help with mygit.";
+  if (
+    q.includes("bye") ||
+    q.includes("stop") ||
+    q.includes("exit") ||
+    q.includes("thanks") ||
+    q.includes("thank you")
+  ) {
+    return "Awesome, happy coding! Click the orb anytime you want to chat.";
   }
 
-  return "You can ask me how to install mygit on Windows, Linux, or Mac, how to authenticate with mygit login, or how to create and push your first repository.";
+  return "I'm listening! Ask me how to install mygit on Windows, Linux, or Mac, how to log in, or how to push your first repository.";
+}
+
+function getSupportedMimeType(): string {
+  const candidates = [
+    "audio/webm;codecs=opus",
+    "audio/webm",
+    "audio/mp4",
+    "audio/ogg;codecs=opus",
+  ];
+  for (const type of candidates) {
+    if (typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(type)) {
+      return type;
+    }
+  }
+  return "";
 }
 
 export function ElevenLabsOrb({
@@ -72,7 +93,8 @@ export function ElevenLabsOrb({
   const audioCtxRef = useRef<AudioContext | null>(null);
   const activeSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const micStreamRef = useRef<MediaStream | null>(null);
-  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const micSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
   const rafRef = useRef<number | null>(null);
   const abortCtrlRef = useRef<AbortController | null>(null);
 
@@ -83,28 +105,27 @@ export function ElevenLabsOrb({
     }
   }, []);
 
-  const runAnalyserMeter = useCallback(
-    (analyser: AnalyserNode) => {
-      stopMeter();
-      const data = new Uint8Array(analyser.frequencyBinCount);
-      const tick = () => {
-        if (!activeRef.current) return;
-        analyser.getByteFrequencyData(data);
-        let sum = 0;
-        for (let i = 0; i < data.length; i++) sum += data[i];
-        const avg = sum / data.length;
-        const level = Math.min(1, Math.max(0.12, avg / 110));
-        orbRef.current?.setAudioLevel(level);
-        rafRef.current = requestAnimationFrame(tick);
-      };
-      rafRef.current = requestAnimationFrame(tick);
-    },
-    [stopMeter],
-  );
+  const stopRecorder = useCallback(() => {
+    const rec = recorderRef.current;
+    if (rec) {
+      recorderRef.current = null;
+      rec.ondataavailable = null;
+      rec.onstop = null;
+      rec.onerror = null;
+      if (rec.state !== "inactive") {
+        try {
+          rec.stop();
+        } catch {
+          // Ignore
+        }
+      }
+    }
+  }, []);
 
   const stopSession = useCallback(() => {
     activeRef.current = false;
     stopMeter();
+    stopRecorder();
 
     if (abortCtrlRef.current) {
       abortCtrlRef.current.abort();
@@ -115,20 +136,17 @@ export function ElevenLabsOrb({
         activeSourceRef.current.onended = null;
         activeSourceRef.current.stop();
       } catch {
-        // Ignore if already stopped
+        // Ignore
       }
       activeSourceRef.current = null;
     }
-    if (recognitionRef.current) {
+    if (micSourceRef.current) {
       try {
-        recognitionRef.current.onend = null;
-        recognitionRef.current.onresult = null;
-        recognitionRef.current.onerror = null;
-        recognitionRef.current.abort();
+        micSourceRef.current.disconnect();
       } catch {
         // Ignore
       }
-      recognitionRef.current = null;
+      micSourceRef.current = null;
     }
     if (micStreamRef.current) {
       micStreamRef.current.getTracks().forEach((t) => t.stop());
@@ -138,7 +156,26 @@ export function ElevenLabsOrb({
     setOrbState("idle");
     setStatusLabel("");
     orbRef.current?.setAudioLevel(0.15);
-  }, [stopMeter]);
+  }, [stopMeter, stopRecorder]);
+
+  const runOutputMeter = useCallback(
+    (analyser: AnalyserNode) => {
+      stopMeter();
+      const data = new Uint8Array(analyser.frequencyBinCount);
+      const tick = () => {
+        if (!activeRef.current) return;
+        analyser.getByteFrequencyData(data);
+        let sum = 0;
+        for (let i = 0; i < data.length; i++) sum += data[i];
+        const avg = sum / data.length;
+        const level = Math.min(1, Math.max(0.12, avg / 105));
+        orbRef.current?.setAudioLevel(level);
+        rafRef.current = requestAnimationFrame(tick);
+      };
+      rafRef.current = requestAnimationFrame(tick);
+    },
+    [stopMeter],
+  );
 
   const playAudioBuffer = useCallback(
     async (arrayBuffer: ArrayBuffer): Promise<void> => {
@@ -161,7 +198,7 @@ export function ElevenLabsOrb({
 
       setOrbState("speaking");
       setStatusLabel("Speaking");
-      runAnalyserMeter(analyser);
+      runOutputMeter(analyser);
 
       await new Promise<void>((resolve) => {
         source.onended = () => {
@@ -172,7 +209,7 @@ export function ElevenLabsOrb({
         source.start(0);
       });
     },
-    [runAnalyserMeter, stopMeter],
+    [runOutputMeter, stopMeter],
   );
 
   const speakWithElevenLabs = useCallback(
@@ -197,7 +234,12 @@ export function ElevenLabsOrb({
           body: JSON.stringify({
             text,
             model_id: "eleven_flash_v2_5",
-            voice_settings: { stability: 0.5, similarity_boost: 0.75 },
+            voice_settings: {
+              stability: 0.32,
+              similarity_boost: 0.8,
+              style: 0.55,
+              use_speaker_boost: true,
+            },
           }),
         },
       );
@@ -212,64 +254,109 @@ export function ElevenLabsOrb({
     [apiKey, voiceId, playAudioBuffer],
   );
 
-  const startListening = useCallback(() => {
-    if (!activeRef.current) return;
+  const transcribeAudio = useCallback(
+    async (blob: Blob): Promise<string> => {
+      const ctrl = new AbortController();
+      abortCtrlRef.current = ctrl;
 
-    const SpeechRecognitionCtor =
-      (window as unknown as { SpeechRecognition?: new () => SpeechRecognitionLike }).SpeechRecognition ||
-      (window as unknown as { webkitSpeechRecognition?: new () => SpeechRecognitionLike }).webkitSpeechRecognition;
+      const form = new FormData();
+      form.append("model_id", "scribe_v1");
+      form.append("language_code", "en");
+      form.append("file", blob, "voice.webm");
 
-    // Drive orb with live microphone volume while listening
-    if (micStreamRef.current && audioCtxRef.current) {
-      try {
-        const micSource = audioCtxRef.current.createMediaStreamSource(micStreamRef.current);
-        const micAnalyser = audioCtxRef.current.createAnalyser();
-        micAnalyser.fftSize = 128;
-        micSource.connect(micAnalyser);
-        runAnalyserMeter(micAnalyser);
-      } catch {
-        // Fallback if stream analyser fails
+      const res = await fetch("https://api.elevenlabs.io/v1/speech-to-text", {
+        method: "POST",
+        signal: ctrl.signal,
+        headers: {
+          "xi-api-key": apiKey,
+        },
+        body: form,
+      });
+
+      if (!res.ok) {
+        throw new Error(`ElevenLabs STT failed (${res.status})`);
       }
-    }
 
-    if (!SpeechRecognitionCtor) {
-      // Browser doesn't support SpeechRecognition; stay idle after speaking
-      stopSession();
-      return;
-    }
+      const data = (await res.json()) as { text?: string };
+      return (data.text ?? "").trim();
+    },
+    [apiKey],
+  );
+
+  const startListening = useCallback(() => {
+    if (!activeRef.current || !micStreamRef.current || !audioCtxRef.current) return;
+
+    stopMeter();
+    stopRecorder();
 
     setOrbState("listening");
     setStatusLabel("Listening");
 
-    const recognition = new SpeechRecognitionCtor();
-    recognition.continuous = false;
-    recognition.interimResults = false;
-    recognition.lang = "en-US";
-    recognitionRef.current = recognition;
+    const stream = micStreamRef.current;
+    const ctx = audioCtxRef.current;
 
-    let handledResult = false;
+    if (!micSourceRef.current) {
+      micSourceRef.current = ctx.createMediaStreamSource(stream);
+    }
+    const micAnalyser = ctx.createAnalyser();
+    micAnalyser.fftSize = 512;
+    micSourceRef.current.connect(micAnalyser);
 
-    recognition.onresult = (event) => {
-      const last = event.results[event.results.length - 1];
-      if (!last || !last.isFinal) return;
-      const transcript = last[0]?.transcript?.trim();
-      if (!transcript || !activeRef.current) return;
+    const mimeType = getSupportedMimeType();
+    const recorder = mimeType
+      ? new MediaRecorder(stream, { mimeType })
+      : new MediaRecorder(stream);
+    recorderRef.current = recorder;
 
-      handledResult = true;
-      try {
-        recognition.stop();
-      } catch {
-        // Ignore
+    const chunks: BlobPart[] = [];
+    let hasSpoken = false;
+    let speechStartMs = 0;
+    let lastSpeechMs = performance.now();
+    const recordStartMs = performance.now();
+    let finishing = false;
+
+    recorder.ondataavailable = (e) => {
+      if (e.data && e.data.size > 0) {
+        chunks.push(e.data);
+      }
+    };
+
+    recorder.onstop = () => {
+      stopMeter();
+      if (!activeRef.current) return;
+
+      if (!hasSpoken || chunks.length === 0) {
+        // No speech detected in window; seamlessly start a fresh listening window
+        startListening();
+        return;
       }
 
-      const reply = buildReply(transcript);
-      const shouldEndAfter =
-        /\b(bye|goodbye|stop|exit|quit)\b/i.test(transcript);
+      const audioBlob = new Blob(chunks, { type: mimeType || "audio/webm" });
+      if (audioBlob.size < 1500) {
+        startListening();
+        return;
+      }
 
       void (async () => {
         try {
+          setOrbState("thinking");
+          setStatusLabel("Thinking");
+          const transcript = await transcribeAudio(audioBlob);
+          if (!activeRef.current) return;
+
+          if (!transcript || transcript.replace(/[^\w]/g, "").length < 2) {
+            startListening();
+            return;
+          }
+
+          const reply = buildReply(transcript);
+          const shouldEndAfter = /\b(bye|goodbye|stop|exit|quit)\b/i.test(
+            transcript,
+          );
+
           await speakWithElevenLabs(reply);
           if (!activeRef.current) return;
+
           if (shouldEndAfter) {
             stopSession();
           } else {
@@ -277,45 +364,70 @@ export function ElevenLabsOrb({
           }
         } catch (err) {
           if ((err as Error).name === "AbortError") return;
-          console.error("ElevenLabs reply error:", err);
-          stopSession();
+          console.error("Voice turn error:", err);
+          if (activeRef.current) {
+            startListening();
+          }
         }
       })();
     };
 
-    recognition.onerror = (event) => {
-      if (!activeRef.current) return;
-      if (event.error === "no-speech" && !handledResult) {
-        // Restart listening silently if user paused
+    recorder.start(200);
+
+    // Voice Activity Detection + live mic orb animation loop
+    const timeData = new Uint8Array(micAnalyser.fftSize);
+    const SPEECH_THRESHOLD = 0.02;
+    const SILENCE_HANGOVER_MS = 1200;
+    const MAX_UTTERANCE_MS = 10000;
+    const IDLE_ROLLOVER_MS = 15000;
+
+    const vadTick = () => {
+      if (!activeRef.current || finishing || recorderRef.current !== recorder) return;
+
+      micAnalyser.getByteTimeDomainData(timeData);
+      let sumSq = 0;
+      for (let i = 0; i < timeData.length; i++) {
+        const v = (timeData[i] - 128) / 128;
+        sumSq += v * v;
+      }
+      const rms = Math.sqrt(sumSq / timeData.length);
+      orbRef.current?.setAudioLevel(Math.min(1, Math.max(0.12, rms * 6)));
+
+      const now = performance.now();
+      if (rms > SPEECH_THRESHOLD) {
+        if (!hasSpoken) {
+          hasSpoken = true;
+          speechStartMs = now;
+        }
+        lastSpeechMs = now;
+      }
+
+      const shouldStopAfterSpeech =
+        hasSpoken &&
+        (now - lastSpeechMs > SILENCE_HANGOVER_MS ||
+          now - speechStartMs > MAX_UTTERANCE_MS);
+      const shouldRolloverIdle =
+        !hasSpoken && now - recordStartMs > IDLE_ROLLOVER_MS;
+
+      if (shouldStopAfterSpeech || shouldRolloverIdle) {
+        finishing = true;
+        if (recorder.state !== "inactive") {
+          recorder.stop();
+        }
         return;
       }
-      if (event.error === "not-allowed" || event.error === "service-not-allowed") {
-        stopSession();
-        setOrbState("error");
-        setStatusLabel("Mic blocked");
-        setTimeout(() => {
-          setOrbState("idle");
-          setStatusLabel("");
-        }, 2500);
-      }
+
+      rafRef.current = requestAnimationFrame(vadTick);
     };
 
-    recognition.onend = () => {
-      if (!activeRef.current || handledResult) return;
-      // Continue listening seamlessly until user stops or speaks
-      try {
-        recognition.start();
-      } catch {
-        // Ignore if already started
-      }
-    };
-
-    try {
-      recognition.start();
-    } catch {
-      // Ignore start race
-    }
-  }, [runAnalyserMeter, speakWithElevenLabs, stopSession]);
+    rafRef.current = requestAnimationFrame(vadTick);
+  }, [
+    stopMeter,
+    stopRecorder,
+    transcribeAudio,
+    speakWithElevenLabs,
+    stopSession,
+  ]);
 
   const startSession = async () => {
     try {
@@ -323,9 +435,14 @@ export function ElevenLabsOrb({
       setOrbState("thinking");
       setStatusLabel("Connecting...");
 
-      // Request microphone permission for two-way voice
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
+        });
         if (!activeRef.current) {
           stream.getTracks().forEach((t) => t.stop());
           return;
@@ -343,7 +460,6 @@ export function ElevenLabsOrb({
           }, 2500);
           return;
         }
-        // If no physical mic device exists, continue with one-way voice greeting
       }
 
       if (!audioCtxRef.current || audioCtxRef.current.state === "closed") {
@@ -354,13 +470,11 @@ export function ElevenLabsOrb({
         audioCtxRef.current = new AudioContextClass();
       }
 
-      // Play cached ElevenLabs greeting generated with voiceId for instant response
       const res = await fetch("/mygit_agent_speech.mp3");
       if (!res.ok) throw new Error("Failed to load greeting audio");
       const buf = await res.arrayBuffer();
       await playAudioBuffer(buf);
 
-      // Transition into two-way listening if still active and mic available
       if (activeRef.current) {
         if (micStreamRef.current) {
           startListening();
@@ -411,7 +525,11 @@ export function ElevenLabsOrb({
         onClick={handleClick}
         className="relative p-0.5 rounded-full cursor-pointer focus:outline-hidden hover:scale-105 active:scale-95 transition-transform select-none"
         title={activeRef.current ? "Click to stop" : "Click to talk with mygit"}
-        aria-label={statusLabel ? `Voice assistant: ${statusLabel}` : "Start voice conversation"}
+        aria-label={
+          statusLabel
+            ? `Voice assistant: ${statusLabel}`
+            : "Start voice conversation"
+        }
       >
         <div className="relative w-9 h-9 sm:w-9.5 sm:h-9.5 rounded-full overflow-hidden flex items-center justify-center bg-neutral-950 shrink-0">
           <LiquidGlassOrb
