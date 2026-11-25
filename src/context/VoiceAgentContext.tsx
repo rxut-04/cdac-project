@@ -421,11 +421,14 @@ function VoiceAgentProviderInner({ children }: { children: React.ReactNode }) {
         typeof navigator !== "undefined" &&
         navigator.mediaDevices?.getUserMedia
       ) {
-        await navigator.mediaDevices.getUserMedia({ audio: true });
+        const probeStream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+        });
+        probeStream.getTracks().forEach((track) => track.stop());
       }
       await conversation.startSession({
         agentId: AGENT_ID,
-        connectionType: "websocket",
+        connectionType: "webrtc",
       });
     } catch (err) {
       console.warn("Microphone or session initialization:", err);
