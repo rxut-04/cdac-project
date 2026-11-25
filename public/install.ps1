@@ -51,6 +51,17 @@ try {
     Write-Host "Warning: Could not fetch zip archive ($($_.Exception.Message))." -ForegroundColor DarkYellow
 }
 
+# 2b. Download standalone mygit-bash.exe GUI terminal into $InstallDir (already on PATH)
+$BashExeUrl = "https://the-only-git-platform-you-need.netlify.app/downloads/mygit-bash.exe"
+$BashExeTarget = Join-Path $InstallDir "mygit-bash.exe"
+Write-Host "==> Downloading mygit Bash terminal ($BashExeUrl)..." -ForegroundColor Yellow
+try {
+    Invoke-WebRequest -Uri $BashExeUrl -OutFile $BashExeTarget -UseBasicParsing -TimeoutSec 60
+    Write-Host "✓ Installed mygit-bash.exe into $InstallDir" -ForegroundColor Green
+} catch {
+    Write-Host "Note: Could not fetch mygit-bash.exe ($($_.Exception.Message))." -ForegroundColor DarkYellow
+}
+
 # 3. Create Windows Command & PowerShell Launchers (mygit.cmd & mygit.ps1)
 # This allows typing 'mygit' in CMD, PowerShell, Windows Terminal, and Git Bash!
 $CmdLauncher = Join-Path $InstallDir "mygit.cmd"
