@@ -28,7 +28,7 @@ export const ContributionHeatmap: React.FC<ContributionHeatmapProps> = ({
     const fetchContributions = (showLoader = false) => {
       if (showLoader) setLoading(true);
       // Prefer authenticated /user/contributions when token exists, fallback to /users/:username/contributions
-      const hasToken = typeof window !== "undefined" && Boolean(localStorage.getItem("mygit_token"));
+      const hasToken = typeof window !== "undefined" && Boolean(localStorage.getItem("token"));
       const url = hasToken
         ? "/user/contributions"
         : username

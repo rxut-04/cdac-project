@@ -229,6 +229,8 @@ export function DashboardPage({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [exploreResults, setExploreResults] = useState<any[]>([]);
   const [exploreLoading, setExploreLoading] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<"loading" | "ok" | "error" | "no-token">("loading");
+  const [syncError, setSyncError] = useState<string | null>(null);
 
   useEffect(() => {
     if (active !== "/explore") return;
@@ -254,6 +256,14 @@ export function DashboardPage({
   }, [active, exploreQuery]);
 
   const refreshDashboard = useCallback(async () => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    if (!token) {
+      setSyncStatus("no-token");
+      setSyncError("No active backend session token. Sign in with your mygit email/password to load your repositories.");
+      return;
+    }
+    setSyncStatus("loading");
+    setSyncError(null);
     try {
       const [summary, tokenList, sshList, discList] = await Promise.all([
         dashboardApi.getSummary(),
@@ -399,8 +409,41 @@ export function DashboardPage({
           lastActivity: formatRelativeTime(d.updatedAt || d.createdAt),
         })));
       }
-    } catch (err) {
+      setSyncStatus("ok");
+    } catch (err: any) {
       console.debug("Dashboard summary sync error:", err);
+      const msg = err?.response?.data?.error || err?.message || "Backend waking up or unreachable";
+      setSyncStatus("error");
+      setSyncError(msg);
+      // Fallback: try basic /repos endpoint if summary failed
+      try {
+        const basicRepos = await repoApi.list();
+        if (Array.isArray(basicRepos)) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          setRepos(basicRepos.map((r: any) => ({
+            id: String(r.id),
+            name: r.name,
+            description: r.description || "No description provided.",
+            lang: "Git",
+            langColor: "bg-foreground/40",
+            stars: r.starsCount || 0,
+            forks: r.forksCount || 0,
+            isStarred: false,
+            updated: formatRelativeTime(r.updatedAt),
+            isPrivate: Boolean(r.isPrivate),
+            ownerUsername: r.ownerUsername || username,
+            forkedFrom: r.forkedFrom,
+            lastAction: `Updated ${formatRelativeTime(r.updatedAt)}`,
+          })));
+          setSyncStatus("ok");
+          setSyncError(null);
+        }
+      } catch {
+        // Auto-retry once in 4s (handles Render cold start)
+        setTimeout(() => {
+          refreshDashboard();
+        }, 4000);
+      }
     }
   }, [username, userEmail]);
 
@@ -3151,6 +3194,40 @@ export function DashboardPage({
               <h1 className="text-3xl font-bold tracking-tight text-foreground">
                 Welcome back, {username}
               </h1>
+
+              {syncStatus === "loading" && (
+                <div className="p-3 rounded-lg border border-border/50 bg-foreground/5 text-xs font-mono text-foreground/60 flex items-center justify-between gap-3">
+                  <span>Syncing live workspace data from Neon PostgreSQL (Render backend may take ~30s on cold start)...</span>
+                </div>
+              )}
+
+              {syncStatus === "no-token" && (
+                <div className="p-3.5 rounded-lg border border-amber-500/40 bg-amber-500/10 text-xs font-mono text-amber-300 flex items-center justify-between gap-3 flex-wrap">
+                  <span>{syncError}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      window.location.hash = "#login";
+                    }}
+                    className="px-3 py-1 rounded bg-accent-pro text-white text-xs font-medium"
+                  >
+                    Sign In
+                  </button>
+                </div>
+              )}
+
+              {syncStatus === "error" && (
+                <div className="p-3.5 rounded-lg border border-red-500/40 bg-red-500/10 text-xs font-mono text-red-300 flex items-center justify-between gap-3 flex-wrap">
+                  <span>Backend sync error: {syncError}</span>
+                  <button
+                    type="button"
+                    onClick={() => refreshDashboard()}
+                    className="px-3 py-1 rounded border border-red-400/40 bg-red-500/20 text-white text-xs font-medium"
+                  >
+                    Retry Now
+                  </button>
+                </div>
+              )}
 
               <div className="flex flex-col gap-1 text-sm text-foreground/60 leading-relaxed">
                 <p>
