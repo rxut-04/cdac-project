@@ -213,4 +213,60 @@ export const dashboardApi = {
     const res = await api.post("/discussions", data);
     return res.data;
   },
+
+  listDiscussionComments: async (id: number | string): Promise<any[]> => {
+    const res = await api.get(`/discussions/${id}/comments`);
+    return res.data;
+  },
+
+  addDiscussionComment: async (id: number | string, body: string): Promise<any> => {
+    const res = await api.post(`/discussions/${id}/comments`, { body });
+    return res.data;
+  },
+
+  updateSettings: async (data: {
+    emailOnPr?: boolean;
+    emailOnMention?: boolean;
+    weeklyDigest?: boolean;
+  }): Promise<any> => {
+    const res = await api.patch("/user/settings", data);
+    return res.data;
+  },
+
+  deleteAccount: async (): Promise<void> => {
+    await api.delete("/user");
+  },
+
+  markAllNotificationsRead: async (keys: string[]): Promise<void> => {
+    await api.post("/user/notifications/read-all", { keys });
+  },
+
+  markNotificationRead: async (key: string): Promise<void> => {
+    await api.post(`/user/notifications/${encodeURIComponent(key)}/read`);
+  },
+
+  muteNotification: async (key: string): Promise<void> => {
+    await api.post(`/user/notifications/${encodeURIComponent(key)}/mute`);
+  },
+
+  importRepo: async (data: { url: string; name?: string; isPrivate?: boolean }): Promise<any> => {
+    const res = await api.post("/repos/import", data);
+    return res.data;
+  },
+
+  createIssue: async (
+    repoName: string,
+    data: { title: string; description?: string; labels?: string }
+  ): Promise<any> => {
+    const res = await api.post(`/repos/${encodeURIComponent(repoName)}/issues`, data);
+    return res.data;
+  },
+
+  createPullRequest: async (
+    repoName: string,
+    data: { title: string; description?: string; sourceBranch?: string; targetBranch?: string }
+  ): Promise<any> => {
+    const res = await api.post(`/repos/${encodeURIComponent(repoName)}/pulls`, data);
+    return res.data;
+  },
 };

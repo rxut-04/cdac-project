@@ -208,6 +208,23 @@ export function DashboardPage({
   const [profileForm, setProfileForm] = useState({ fullName: "", bio: "", location: "", website: "" });
   const [newDiscussionOpen, setNewDiscussionOpen] = useState(false);
   const [discussionForm, setDiscussionForm] = useState({ title: "", body: "", category: "General" });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [starredReposList, setStarredReposList] = useState<any[]>([]);
+  const [settingsState, setSettingsState] = useState({
+    emailOnPr: true,
+    emailOnMention: true,
+    weeklyDigest: false,
+  });
+  const [newIssueOpen, setNewIssueOpen] = useState(false);
+  const [issueForm, setIssueForm] = useState({ repo: "", title: "", description: "", labels: "" });
+  const [newPrOpen, setNewPrOpen] = useState(false);
+  const [prForm, setPrForm] = useState({ repo: "", title: "", description: "", sourceBranch: "feature", targetBranch: "main" });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [activeDiscussion, setActiveDiscussion] = useState<any | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [discussionComments, setDiscussionComments] = useState<any[]>([]);
+  const [replyText, setReplyText] = useState("");
+  const [importError, setImportError] = useState<string | null>(null);
 
   const refreshDashboard = useCallback(async () => {
     try {
@@ -296,6 +313,34 @@ export function DashboardPage({
             location: summary.profile.location || "",
             website: summary.profile.website || "",
           });
+        }
+
+        if (summary.settings) {
+          setSettingsState({
+            emailOnPr: Boolean(summary.settings.emailOnPr),
+            emailOnMention: Boolean(summary.settings.emailOnMention),
+            weeklyDigest: Boolean(summary.settings.weeklyDigest),
+          });
+        }
+
+        if (Array.isArray(summary.starredRepos)) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          setStarredReposList(summary.starredRepos.map((r: any) => {
+            const lang = r.primaryLanguage || "Git";
+            return {
+              id: String(r.id),
+              name: r.name,
+              description: r.description || "No description provided.",
+              lang,
+              langColor: LANG_COLORS[lang] || "bg-foreground/40",
+              stars: r.starsCount || 0,
+              forks: r.forksCount || 0,
+              isStarred: true,
+              updated: formatRelativeTime(r.updatedAt),
+              isPrivate: Boolean(r.isPrivate),
+              ownerUsername: r.ownerUsername || username,
+            };
+          }));
         }
       }
 
@@ -491,20 +536,26 @@ export function DashboardPage({
   const [importingState, setImportingState] = useState<"idle" | "running" | "success" | "error">("idle");
   const [importProgress, setImportProgress] = useState(0);
 
-  const handleStartImport = () => {
+  const handleStartImport = async () => {
     if (!importUrl) return;
     setImportingState("running");
-    setImportProgress(10);
-    const interval = setInterval(() => {
-      setImportProgress((p) => {
-        if (p >= 90) {
-          clearInterval(interval);
-          setImportingState("success");
-          return 100;
-        }
-        return p + 25;
+    setImportProgress(30);
+    setImportError(null);
+    try {
+      const imported = await dashboardApi.importRepo({
+        url: importUrl.trim(),
+        name: importRepoName.trim() || undefined,
       });
-    }, 400);
+      setImportProgress(100);
+      setImportingState("success");
+      showToast(`Imported ${imported.name} (${imported.importedFiles ?? 0} files) into Neon DB!`);
+      refreshDashboard();
+    } catch (err: any) {
+      setImportingState("error");
+      const msg = err?.response?.data?.error || err?.message || "Import failed";
+      setImportError(msg);
+      showToast(`Import error: ${msg}`);
+    }
   };
 
   // -------------------------------------------------------------
@@ -614,13 +665,34 @@ export function DashboardPage({
   const [notifTab, setNotifTab] = useState("all");
   const unreadNotifsCount = notifications.filter((n) => n.unread).length;
 
-  const markAllNotifsRead = () => {
+  const markAllNotifsRead = async () => {
+    const keys = notifications.map((n) => String(n.id));
     setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })));
+    try {
+      await dashboardApi.markAllNotificationsRead(keys);
+    } catch {
+      // ignore network error
+    }
     showToast("All notifications marked as read.");
   };
 
-  const markSingleNotifRead = (id: string) => {
+  const markSingleNotifRead = async (id: string) => {
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, unread: false } : n)));
+    try {
+      await dashboardApi.markNotificationRead(id);
+    } catch {
+      // ignore
+    }
+  };
+
+  const muteSingleNotif = async (id: string) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+    try {
+      await dashboardApi.muteNotification(id);
+    } catch {
+      // ignore
+    }
+    showToast("Thread muted.");
   };
 
   // -------------------------------------------------------------
@@ -867,7 +939,7 @@ export function DashboardPage({
                       )}
                       <button
                         type="button"
-                        onClick={() => showToast("Thread muted.")}
+                        onClick={() => muteSingleNotif(item.id)}
                         className="px-2 py-1 rounded hover:bg-foreground/10 text-foreground/40 hover:text-foreground text-[11px] font-mono"
                       >
                         Mute
@@ -1227,7 +1299,7 @@ export function DashboardPage({
       // 5. STARRED VIEW
       // ---------------------------------------------------------
       case "/starred": {
-        const starredRepos = repos.filter((r) => r.isStarred);
+        const starredRepos = starredReposList.length > 0 ? starredReposList : repos.filter((r) => r.isStarred);
 
         return (
           <div className="space-y-6 max-w-5xl">
@@ -1253,8 +1325,11 @@ export function DashboardPage({
                   >
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
-                        <span className="font-semibold text-sm text-foreground hover:underline cursor-pointer">
-                          {repo.name}
+                        <span
+                          onClick={() => setSelectedRepoForTree(repo)}
+                          className="font-semibold text-sm text-foreground hover:underline cursor-pointer"
+                        >
+                          {repo.ownerUsername ? `${repo.ownerUsername}/${repo.name}` : repo.name}
                         </span>
                         <span className="text-xs text-foreground/40 font-mono">· {repo.lang}</span>
                       </div>
@@ -1263,7 +1338,14 @@ export function DashboardPage({
 
                     <button
                       type="button"
-                      onClick={() => toggleStar(repo.id)}
+                      onClick={async () => {
+                        try {
+                          await repoApi.toggleStar(repo.name);
+                          refreshDashboard();
+                        } catch {
+                          toggleStar(repo.id);
+                        }
+                      }}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border/50 bg-foreground/5 text-xs text-foreground/70 hover:text-foreground hover:border-border font-mono transition-colors self-start sm:self-auto"
                     >
                       <Star className="size-3 text-yellow-400 fill-yellow-400" />
@@ -1542,7 +1624,14 @@ export function DashboardPage({
               {importingState === "success" && (
                 <div className="p-3.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 text-emerald-400 text-xs flex items-center gap-2">
                   <CheckCircle2 className="size-4 shrink-0" />
-                  <span>Repository imported successfully! All commits and tags verified.</span>
+                  <span>Repository imported successfully into Neon PostgreSQL!</span>
+                </div>
+              )}
+
+              {importingState === "error" && importError && (
+                <div className="p-3.5 rounded-lg border border-red-500/40 bg-red-500/10 text-red-400 text-xs flex items-center gap-2">
+                  <AlertCircle className="size-4 shrink-0" />
+                  <span>{importError}</span>
                 </div>
               )}
 
@@ -1635,12 +1724,121 @@ export function DashboardPage({
                 </p>
               </div>
 
-              <div className="flex items-center gap-2 text-xs font-mono text-foreground/60">
-                <span className="text-emerald-400 font-semibold">{openPRs.length} Open</span>
-                <span>·</span>
-                <span>{closedPRs.length} Closed</span>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 text-xs font-mono text-foreground/60">
+                  <span className="text-emerald-400 font-semibold">{openPRs.length} Open</span>
+                  <span>·</span>
+                  <span>{closedPRs.length} Closed</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPrForm((p) => ({ ...p, repo: p.repo || repos[0]?.name || "" }));
+                    setNewPrOpen(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-md bg-accent-pro text-white text-xs font-medium"
+                >
+                  <Plus className="size-3.5" />
+                  <span>New Pull Request</span>
+                </button>
               </div>
             </div>
+
+            {newPrOpen && (
+              <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    if (!prForm.repo || !prForm.title.trim()) return;
+                    try {
+                      await dashboardApi.createPullRequest(prForm.repo, {
+                        title: prForm.title.trim(),
+                        description: prForm.description,
+                        sourceBranch: prForm.sourceBranch || "feature",
+                        targetBranch: prForm.targetBranch || "main",
+                      });
+                      setNewPrOpen(false);
+                      setPrForm({ repo: repos[0]?.name || "", title: "", description: "", sourceBranch: "feature", targetBranch: "main" });
+                      showToast("Pull request created!");
+                      refreshDashboard();
+                    } catch (err: any) {
+                      showToast(err?.response?.data?.error || "Failed to create pull request.");
+                    }
+                  }}
+                  className="max-w-md w-full p-6 rounded-2xl border border-border/50 bg-card space-y-4 shadow-2xl"
+                >
+                  <div className="flex items-center justify-between border-b border-border/40 pb-3">
+                    <h3 className="font-bold text-sm text-foreground">Create Pull Request</h3>
+                    <button type="button" onClick={() => setNewPrOpen(false)} className="text-foreground/40 hover:text-foreground">
+                      <X className="size-4" />
+                    </button>
+                  </div>
+                  <div>
+                    <label className="text-xs font-mono text-foreground/50 block mb-1">Repository *</label>
+                    <select
+                      required
+                      value={prForm.repo}
+                      onChange={(e) => setPrForm((p) => ({ ...p, repo: e.target.value }))}
+                      className="w-full px-3 py-2 rounded-md border border-border/50 bg-foreground/5 text-xs text-foreground font-mono outline-none"
+                    >
+                      <option value="" disabled>Select repository</option>
+                      {repos.map((r) => (
+                        <option key={r.id} value={r.name}>{r.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-mono text-foreground/50 block mb-1">Title *</label>
+                    <input
+                      type="text"
+                      required
+                      value={prForm.title}
+                      onChange={(e) => setPrForm((p) => ({ ...p, title: e.target.value }))}
+                      placeholder="feat: add new module"
+                      className="w-full px-3 py-2 rounded-md border border-border/50 bg-foreground/5 text-xs text-foreground font-mono outline-none"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-mono text-foreground/50 block mb-1">Source branch</label>
+                      <input
+                        type="text"
+                        value={prForm.sourceBranch}
+                        onChange={(e) => setPrForm((p) => ({ ...p, sourceBranch: e.target.value }))}
+                        className="w-full px-3 py-2 rounded-md border border-border/50 bg-foreground/5 text-xs text-foreground font-mono outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-mono text-foreground/50 block mb-1">Target branch</label>
+                      <input
+                        type="text"
+                        value={prForm.targetBranch}
+                        onChange={(e) => setPrForm((p) => ({ ...p, targetBranch: e.target.value }))}
+                        className="w-full px-3 py-2 rounded-md border border-border/50 bg-foreground/5 text-xs text-foreground font-mono outline-none"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-mono text-foreground/50 block mb-1">Description</label>
+                    <textarea
+                      rows={3}
+                      value={prForm.description}
+                      onChange={(e) => setPrForm((p) => ({ ...p, description: e.target.value }))}
+                      placeholder="Describe the changes..."
+                      className="w-full px-3 py-2 rounded-md border border-border/50 bg-foreground/5 text-xs text-foreground font-mono outline-none"
+                    />
+                  </div>
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-border/40">
+                    <button type="button" onClick={() => setNewPrOpen(false)} className="px-3 py-1.5 rounded-md border border-border/50 text-xs text-foreground/60">
+                      Cancel
+                    </button>
+                    <button type="submit" className="px-4 py-1.5 rounded-md bg-accent-pro text-white text-xs font-medium">
+                      Create PR
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
 
             {/* PR Rows */}
             <div className="space-y-2.5">
@@ -1727,13 +1925,101 @@ export function DashboardPage({
 
               <button
                 type="button"
-                onClick={() => showToast("Opening issue creator...")}
+                onClick={() => {
+                  setIssueForm((p) => ({ ...p, repo: p.repo || repos[0]?.name || "" }));
+                  setNewIssueOpen(true);
+                }}
                 className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-md bg-accent-pro text-white text-xs font-medium"
               >
                 <Plus className="size-3.5" />
                 <span>New Issue</span>
               </button>
             </div>
+
+            {newIssueOpen && (
+              <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    if (!issueForm.repo || !issueForm.title.trim()) return;
+                    try {
+                      await dashboardApi.createIssue(issueForm.repo, {
+                        title: issueForm.title.trim(),
+                        description: issueForm.description,
+                        labels: issueForm.labels,
+                      });
+                      setNewIssueOpen(false);
+                      setIssueForm({ repo: repos[0]?.name || "", title: "", description: "", labels: "" });
+                      showToast("Issue created!");
+                      refreshDashboard();
+                    } catch (err: any) {
+                      showToast(err?.response?.data?.error || "Failed to create issue.");
+                    }
+                  }}
+                  className="max-w-md w-full p-6 rounded-2xl border border-border/50 bg-card space-y-4 shadow-2xl"
+                >
+                  <div className="flex items-center justify-between border-b border-border/40 pb-3">
+                    <h3 className="font-bold text-sm text-foreground">Create New Issue</h3>
+                    <button type="button" onClick={() => setNewIssueOpen(false)} className="text-foreground/40 hover:text-foreground">
+                      <X className="size-4" />
+                    </button>
+                  </div>
+                  <div>
+                    <label className="text-xs font-mono text-foreground/50 block mb-1">Repository *</label>
+                    <select
+                      required
+                      value={issueForm.repo}
+                      onChange={(e) => setIssueForm((p) => ({ ...p, repo: e.target.value }))}
+                      className="w-full px-3 py-2 rounded-md border border-border/50 bg-foreground/5 text-xs text-foreground font-mono outline-none"
+                    >
+                      <option value="" disabled>Select repository</option>
+                      {repos.map((r) => (
+                        <option key={r.id} value={r.name}>{r.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-mono text-foreground/50 block mb-1">Title *</label>
+                    <input
+                      type="text"
+                      required
+                      value={issueForm.title}
+                      onChange={(e) => setIssueForm((p) => ({ ...p, title: e.target.value }))}
+                      placeholder="Issue summary"
+                      className="w-full px-3 py-2 rounded-md border border-border/50 bg-foreground/5 text-xs text-foreground font-mono outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-mono text-foreground/50 block mb-1">Labels (comma separated)</label>
+                    <input
+                      type="text"
+                      value={issueForm.labels}
+                      onChange={(e) => setIssueForm((p) => ({ ...p, labels: e.target.value }))}
+                      placeholder="bug, enhancement"
+                      className="w-full px-3 py-2 rounded-md border border-border/50 bg-foreground/5 text-xs text-foreground font-mono outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-mono text-foreground/50 block mb-1">Description</label>
+                    <textarea
+                      rows={3}
+                      value={issueForm.description}
+                      onChange={(e) => setIssueForm((p) => ({ ...p, description: e.target.value }))}
+                      placeholder="Steps to reproduce or details..."
+                      className="w-full px-3 py-2 rounded-md border border-border/50 bg-foreground/5 text-xs text-foreground font-mono outline-none"
+                    />
+                  </div>
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-border/40">
+                    <button type="button" onClick={() => setNewIssueOpen(false)} className="px-3 py-1.5 rounded-md border border-border/50 text-xs text-foreground/60">
+                      Cancel
+                    </button>
+                    <button type="submit" className="px-4 py-1.5 rounded-md bg-accent-pro text-white text-xs font-medium">
+                      Submit Issue
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
 
             <div className="space-y-2.5">
               {issues.length === 0 ? (
@@ -1897,7 +2183,16 @@ export function DashboardPage({
                 {discussions.map((d) => (
                   <div
                     key={d.id}
-                    className="p-5 rounded-xl border border-border/50 bg-foreground/5 space-y-2 hover:border-border transition-colors"
+                    onClick={async () => {
+                      setActiveDiscussion(d);
+                      try {
+                        const comments = await dashboardApi.listDiscussionComments(d.id);
+                        setDiscussionComments(comments);
+                      } catch {
+                        setDiscussionComments([]);
+                      }
+                    }}
+                    className="p-5 rounded-xl border border-border/50 bg-foreground/5 space-y-2 hover:border-border transition-colors cursor-pointer"
                   >
                     <div className="flex items-center gap-2">
                       <span className="text-[10px] font-mono px-2 py-0.5 rounded-full border border-border/50 bg-foreground/10 text-foreground/70">
@@ -1907,7 +2202,7 @@ export function DashboardPage({
                         by {d.author} · {d.lastActivity}
                       </span>
                     </div>
-                    <h3 className="text-sm font-semibold text-foreground">{d.title}</h3>
+                    <h3 className="text-sm font-semibold text-foreground hover:underline">{d.title}</h3>
                     {d.body && <p className="text-xs text-foreground/60 line-clamp-2">{d.body}</p>}
                     <p className="text-xs text-foreground/40 font-mono flex items-center gap-1">
                       <MessageSquare className="size-3" />
@@ -1915,6 +2210,73 @@ export function DashboardPage({
                     </p>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {activeDiscussion && (
+              <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+                <div className="max-w-lg w-full max-h-[85vh] flex flex-col p-6 rounded-2xl border border-border/50 bg-card space-y-4 shadow-2xl">
+                  <div className="flex items-start justify-between border-b border-border/40 pb-3 gap-3">
+                    <div>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full border border-border/50 bg-foreground/10 text-foreground/70">
+                        {activeDiscussion.category}
+                      </span>
+                      <h3 className="font-bold text-sm text-foreground mt-2">{activeDiscussion.title}</h3>
+                      <p className="text-[11px] font-mono text-foreground/45 mt-0.5">
+                        by @{activeDiscussion.author} · {activeDiscussion.lastActivity}
+                      </p>
+                    </div>
+                    <button type="button" onClick={() => setActiveDiscussion(null)} className="text-foreground/40 hover:text-foreground">
+                      <X className="size-4" />
+                    </button>
+                  </div>
+                  {activeDiscussion.body && (
+                    <p className="text-xs text-foreground/80 whitespace-pre-wrap">{activeDiscussion.body}</p>
+                  )}
+                  <div className="flex-1 overflow-y-auto space-y-2.5 border-t border-border/30 pt-3">
+                    {discussionComments.length === 0 ? (
+                      <p className="text-xs text-foreground/40 font-mono">No replies yet. Be the first to comment.</p>
+                    ) : (
+                      discussionComments.map((c) => (
+                        <div key={c.id} className="p-3 rounded-lg border border-border/40 bg-foreground/5 space-y-1">
+                          <div className="flex items-center justify-between text-[11px] font-mono text-foreground/50">
+                            <span className="text-foreground font-semibold">@{c.author}</span>
+                            <span>{formatRelativeTime(c.createdAt)}</span>
+                          </div>
+                          <p className="text-xs text-foreground/80 whitespace-pre-wrap">{c.body}</p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  <form
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      if (!replyText.trim()) return;
+                      try {
+                        const added = await dashboardApi.addDiscussionComment(activeDiscussion.id, replyText.trim());
+                        setDiscussionComments((prev) => [...prev, added]);
+                        setDiscussions((prev) =>
+                          prev.map((d) => (d.id === activeDiscussion.id ? { ...d, replies: added.replies } : d))
+                        );
+                        setReplyText("");
+                      } catch {
+                        showToast("Failed to post reply.");
+                      }
+                    }}
+                    className="flex items-center gap-2 pt-2 border-t border-border/40"
+                  >
+                    <input
+                      type="text"
+                      value={replyText}
+                      onChange={(e) => setReplyText(e.target.value)}
+                      placeholder="Write a reply..."
+                      className="flex-1 px-3 py-2 rounded-md border border-border/50 bg-foreground/5 text-xs text-foreground font-mono outline-none"
+                    />
+                    <button type="submit" className="px-3.5 py-2 rounded-md bg-accent-pro text-white text-xs font-medium">
+                      Reply
+                    </button>
+                  </form>
+                </div>
               </div>
             )}
 
@@ -2487,14 +2849,16 @@ export function DashboardPage({
             </div>
 
             {/* Profile Settings */}
-            <div className="p-6 rounded-xl border border-border/50 bg-foreground/5 space-y-4">
+            <form onSubmit={handleSaveProfile} className="p-6 rounded-xl border border-border/50 bg-foreground/5 space-y-4">
               <h3 className="text-sm font-semibold text-foreground">Profile & Account</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs font-mono text-foreground/50 block mb-1">Username</label>
+                  <label className="text-xs font-mono text-foreground/50 block mb-1">Display Name</label>
                   <input
                     type="text"
-                    defaultValue={username}
+                    value={profileForm.fullName}
+                    onChange={(e) => setProfileForm((p) => ({ ...p, fullName: e.target.value }))}
+                    placeholder={username}
                     className="w-full px-3 py-2 rounded-md border border-border/50 bg-foreground/5 text-xs text-foreground font-mono"
                   />
                 </div>
@@ -2502,19 +2866,39 @@ export function DashboardPage({
                   <label className="text-xs font-mono text-foreground/50 block mb-1">Email</label>
                   <input
                     type="email"
-                    defaultValue={userEmail}
+                    readOnly
+                    value={profileData.email || userEmail}
+                    className="w-full px-3 py-2 rounded-md border border-border/50 bg-foreground/5 text-xs text-foreground/60 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-mono text-foreground/50 block mb-1">Location</label>
+                  <input
+                    type="text"
+                    value={profileForm.location}
+                    onChange={(e) => setProfileForm((p) => ({ ...p, location: e.target.value }))}
+                    placeholder="City, Country"
+                    className="w-full px-3 py-2 rounded-md border border-border/50 bg-foreground/5 text-xs text-foreground font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-mono text-foreground/50 block mb-1">Website</label>
+                  <input
+                    type="text"
+                    value={profileForm.website}
+                    onChange={(e) => setProfileForm((p) => ({ ...p, website: e.target.value }))}
+                    placeholder="https://..."
                     className="w-full px-3 py-2 rounded-md border border-border/50 bg-foreground/5 text-xs text-foreground font-mono"
                   />
                 </div>
               </div>
               <button
-                type="button"
-                onClick={() => showToast("Account details updated.")}
+                type="submit"
                 className="px-4 py-1.5 rounded-md bg-foreground/10 text-xs font-mono text-foreground hover:bg-foreground/15 border border-border/50"
               >
                 Save changes
               </button>
-            </div>
+            </form>
 
             {/* Notifications Preferences */}
             <div className="p-6 rounded-xl border border-border/50 bg-foreground/5 space-y-3">
@@ -2522,15 +2906,54 @@ export function DashboardPage({
               <div className="space-y-2 text-xs text-foreground/70 font-mono">
                 <label className="flex items-center justify-between p-2 rounded hover:bg-foreground/5 cursor-pointer">
                   <span>Email notifications for Pull Request reviews</span>
-                  <input type="checkbox" defaultChecked />
+                  <input
+                    type="checkbox"
+                    checked={settingsState.emailOnPr}
+                    onChange={async (e) => {
+                      const next = { ...settingsState, emailOnPr: e.target.checked };
+                      setSettingsState(next);
+                      try {
+                        await dashboardApi.updateSettings(next);
+                        showToast("Notification preference saved.");
+                      } catch {
+                        showToast("Failed to save preference.");
+                      }
+                    }}
+                  />
                 </label>
                 <label className="flex items-center justify-between p-2 rounded hover:bg-foreground/5 cursor-pointer">
                   <span>Direct mentions and issue assignments</span>
-                  <input type="checkbox" defaultChecked />
+                  <input
+                    type="checkbox"
+                    checked={settingsState.emailOnMention}
+                    onChange={async (e) => {
+                      const next = { ...settingsState, emailOnMention: e.target.checked };
+                      setSettingsState(next);
+                      try {
+                        await dashboardApi.updateSettings(next);
+                        showToast("Notification preference saved.");
+                      } catch {
+                        showToast("Failed to save preference.");
+                      }
+                    }}
+                  />
                 </label>
                 <label className="flex items-center justify-between p-2 rounded hover:bg-foreground/5 cursor-pointer">
                   <span>Weekly digest of starred repositories</span>
-                  <input type="checkbox" />
+                  <input
+                    type="checkbox"
+                    checked={settingsState.weeklyDigest}
+                    onChange={async (e) => {
+                      const next = { ...settingsState, weeklyDigest: e.target.checked };
+                      setSettingsState(next);
+                      try {
+                        await dashboardApi.updateSettings(next);
+                        showToast("Notification preference saved.");
+                      } catch {
+                        showToast("Failed to save preference.");
+                      }
+                    }}
+                  />
                 </label>
               </div>
             </div>
@@ -2541,8 +2964,10 @@ export function DashboardPage({
               <div className="space-y-2 text-xs font-mono text-foreground/60">
                 <div className="flex items-center justify-between p-2.5 rounded border border-border/30 bg-background/50">
                   <div>
-                    <p className="text-foreground font-medium">Chrome on Linux (This browser)</p>
-                    <p className="text-[11px] text-foreground/40">IP: 192.168.1.104 · Last active now</p>
+                    <p className="text-foreground font-medium">
+                      {typeof navigator !== "undefined" ? navigator.userAgent.split(") ")[0] + ")" : "Current Browser"}
+                    </p>
+                    <p className="text-[11px] text-foreground/40">Authenticated as @{username} · Active now</p>
                   </div>
                   <span className="text-[10px] text-emerald-400">Current session</span>
                 </div>
@@ -2560,9 +2985,14 @@ export function DashboardPage({
               </p>
               <button
                 type="button"
-                onClick={() => {
-                  if (confirm("Are you sure you want to delete your developer account?")) {
-                    onSignOut?.();
+                onClick={async () => {
+                  if (confirm("Are you sure you want to permanently delete your developer account and all repositories?")) {
+                    try {
+                      await dashboardApi.deleteAccount();
+                      onSignOut?.();
+                    } catch {
+                      showToast("Failed to delete account.");
+                    }
                   }
                 }}
                 className="px-4 py-2 rounded-md bg-accent-pro text-white text-xs font-medium hover:opacity-90"
