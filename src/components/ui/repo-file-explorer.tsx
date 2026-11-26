@@ -413,7 +413,7 @@ export function RepoFileExplorer({
       id: assistantId,
       role: "assistant",
       reasoning: {
-        text: `Inspecting ${ownerUsername}/${currentRepoName} (${selectedBranch})${selectedFile ? ` and ${selectedFile.path}` : ""}...`,
+        text: `Inspecting ${ownerUsername}/${currentRepoName} (${currentBranch})${selectedFile ? ` and ${selectedFile.path}` : ""}...`,
       },
       steps: [
         {
@@ -431,7 +431,7 @@ export function RepoFileExplorer({
     try {
       const res = await repoApi.chat(ownerUsername, currentRepoName, {
         message: q,
-        branch: selectedBranch,
+        branch: currentBranch,
         activeFilePath: selectedFile?.path,
         activeFileContent: selectedFile?.code,
       });
