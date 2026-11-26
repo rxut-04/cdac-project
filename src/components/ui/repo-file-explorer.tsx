@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/file-tree";
 import { CodeBlock } from "@/components/ui/code-block";
 import { DiffViewer, FileDiff } from "@/components/ui/diff-viewer";
+import { ReasoningThread, type ThreadMessage } from "@/components/ui/reasoning-thread";
 import {
   ArrowLeft,
   GitBranch,
@@ -47,6 +48,7 @@ import {
   Pencil,
   X,
   Share2,
+  Sparkles,
 } from "lucide-react";
 
 export interface RepoFileExplorerProps {
@@ -395,6 +397,105 @@ export function RepoFileExplorer({
     currentUsername && ownerUsername && currentUsername.toLowerCase() === ownerUsername.toLowerCase()
   );
   const [shareCopied, setShareCopied] = useState(false);
+  const [chatOpen, setChatOpen] = useState(true);
+  const [chatInput, setChatInput] = useState("");
+  const [chatLoading, setChatLoading] = useState(false);
+  const [chatMessages, setChatMessages] = useState<ThreadMessage[]>([]);
+
+  const handleAskRepo = async (overridePrompt?: string) => {
+    const q = (overridePrompt ?? chatInput).trim();
+    if (!q || chatLoading) return;
+    if (!overridePrompt) setChatInput("");
+    const turnId = String(Date.now());
+    const userMsg: ThreadMessage = { id: `u-${turnId}`, role: "user", text: q };
+    const assistantId = `a-${turnId}`;
+    const initialAssistant: ThreadMessage = {
+      id: assistantId,
+      role: "assistant",
+      reasoning: {
+        text: `Inspecting ${ownerUsername}/${currentRepoName} (${selectedBranch})${selectedFile ? ` and ${selectedFile.path}` : ""}...`,
+      },
+      steps: [
+        {
+          id: `scan-${turnId}`,
+          title: "Scanning repository tree & active file",
+          state: "running",
+        },
+      ],
+      streaming: true,
+      text: "",
+    };
+
+    setChatMessages((prev) => [...prev, userMsg, initialAssistant]);
+    setChatLoading(true);
+    try {
+      const res = await repoApi.chat(ownerUsername, currentRepoName, {
+        message: q,
+        branch: selectedBranch,
+        activeFilePath: selectedFile?.path,
+        activeFileContent: selectedFile?.code,
+      });
+
+      const words = (res.reply || "").split(" ");
+      setChatMessages((prev) =>
+        prev.map((m) =>
+          m.id === assistantId && m.role === "assistant"
+            ? {
+                ...m,
+                reasoning: { text: res.reasoning, seconds: res.reasoningSeconds || 1 },
+                steps: res.steps,
+                text: words.length <= 1 ? res.reply : words[0],
+                streaming: words.length > 1,
+              }
+            : m
+        )
+      );
+
+      if (words.length > 1) {
+        let idx = 1;
+        const stepSize = Math.max(1, Math.ceil(words.length / 24));
+        const timer = window.setInterval(() => {
+          idx = Math.min(words.length, idx + stepSize);
+          const partial = words.slice(0, idx).join(" ");
+          const done = idx >= words.length;
+          setChatMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId && m.role === "assistant"
+                ? { ...m, text: partial, streaming: !done }
+                : m
+            )
+          );
+          if (done) {
+            window.clearInterval(timer);
+          }
+        }, 35);
+      }
+    } catch (err: any) {
+      const errMsg = err?.response?.data?.error || err?.message || "Failed to reach repository assistant.";
+      setChatMessages((prev) =>
+        prev.map((m) =>
+          m.id === assistantId && m.role === "assistant"
+            ? {
+                ...m,
+                reasoning: { text: "Request failed while querying repository context.", seconds: 1 },
+                steps: [
+                  {
+                    id: `err-${turnId}`,
+                    title: "Repository context query",
+                    state: "error",
+                    detail: errMsg,
+                  },
+                ],
+                streaming: false,
+                text: `Unable to analyze repository right now: **${errMsg}**`,
+              }
+            : m
+        )
+      );
+    } finally {
+      setChatLoading(false);
+    }
+  };
 
   const initialFiles = useMemo(() => getInitialFilesForRepo(currentRepoName, ownerUsername), [currentRepoName, ownerUsername]);
   const [files, setFiles] = useState<RepoFile[]>(initialFiles);
@@ -1343,7 +1444,7 @@ export function RepoFileExplorer({
       {/* TAB 1: CODE EXPLORER */}
       {activeTab === "code" && (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-[18rem_1fr] gap-4 min-h-[520px]">
+          <div className={`grid grid-cols-1 gap-4 min-h-[520px] ${chatOpen ? "lg:grid-cols-[16rem_1fr_22rem]" : "lg:grid-cols-[18rem_1fr]"}`}>
             {/* Left Side: Dynamic FileTree */}
             <div className="rounded-xl border border-border/50 bg-foreground/5 flex flex-col overflow-hidden shadow-sm">
               <div className="p-3 border-b border-border/40 flex items-center justify-between gap-2">
@@ -1428,6 +1529,18 @@ export function RepoFileExplorer({
                       Read-only view
                     </span>
                   )}
+                  <button
+                    type="button"
+                    onClick={() => setChatOpen((v) => !v)}
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md border text-xs font-medium cursor-pointer transition-colors ${
+                      chatOpen
+                        ? "border-accent-pro/50 bg-accent-pro/15 text-accent-pro"
+                        : "border-border/60 bg-background hover:bg-foreground/10 text-foreground"
+                    }`}
+                  >
+                    <Sparkles className="size-3" />
+                    <span>{chatOpen ? "Hide AI" : "Ask AI"}</span>
+                  </button>
                 </div>
               </div>
               <CodeBlock
@@ -1439,6 +1552,81 @@ export function RepoFileExplorer({
                 collapseAfter={false}
               />
             </div>
+
+            {/* Far Right Side: Repo AI Chatbot beside CodeBlock */}
+            {chatOpen && (
+              <div className="flex flex-col min-w-0 rounded-xl border border-border/50 bg-foreground/5 shadow-sm overflow-hidden max-h-[560px]">
+                <div className="px-3.5 py-2.5 border-b border-border/40 flex items-center justify-between gap-2 bg-foreground/5">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Sparkles className="size-3.5 text-accent-pro shrink-0" />
+                    <span className="text-xs font-semibold text-foreground truncate">Repo AI Assistant</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setChatOpen(false)}
+                    className="text-foreground/40 hover:text-foreground p-0.5"
+                    title="Collapse assistant"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-3.5 space-y-4">
+                  {chatMessages.length === 0 ? (
+                    <div className="space-y-3 py-4">
+                      <p className="text-xs text-foreground/60 leading-relaxed">
+                        Ask anything about <span className="font-mono text-foreground">{ownerUsername}/{currentRepoName}</span>
+                        {selectedFile ? (
+                          <> or <span className="font-mono text-foreground">{selectedFile.path}</span></>
+                        ) : null}.
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {[
+                          selectedFile ? `Explain ${selectedFile.path}` : "Summarize this repository",
+                          "Find potential bugs",
+                          "How do I run this project?",
+                        ].map((prompt) => (
+                          <button
+                            key={prompt}
+                            type="button"
+                            onClick={() => handleAskRepo(prompt)}
+                            className="text-[11px] font-mono px-2.5 py-1 rounded-md border border-border/50 bg-background/60 hover:bg-foreground/10 text-foreground/75 text-left transition-colors"
+                          >
+                            {prompt}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <ReasoningThread messages={chatMessages} label="Repository AI Assistant" />
+                  )}
+                </div>
+
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleAskRepo();
+                  }}
+                  className="p-2.5 border-t border-border/40 bg-background/40 flex items-center gap-2"
+                >
+                  <input
+                    type="text"
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    placeholder={selectedFile ? `Ask about ${selectedFile.path}...` : "Ask about this repo..."}
+                    className="flex-1 min-w-0 px-3 py-1.5 rounded-md border border-border/50 bg-foreground/5 text-xs text-foreground font-mono outline-none focus:border-border"
+                  />
+                  <button
+                    type="submit"
+                    disabled={chatLoading || !chatInput.trim()}
+                    className="p-2 rounded-md bg-accent-pro text-white disabled:opacity-40 hover:opacity-90 transition-opacity shrink-0"
+                    title="Send"
+                  >
+                    {chatLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />}
+                  </button>
+                </form>
+              </div>
+            )}
           </div>
 
           {/* In-Browser File Editor Modal */}

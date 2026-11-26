@@ -169,6 +169,32 @@ export const repoApi = {
     const res = await api.post(`/repos/${encodeURIComponent(name)}/files`, payload);
     return res.data;
   },
+
+  chat: async (
+    owner: string,
+    name: string,
+    payload: {
+      message: string;
+      branch?: string;
+      activeFilePath?: string;
+      activeFileContent?: string;
+    }
+  ): Promise<{
+    reply: string;
+    reasoning: string;
+    reasoningSeconds: number;
+    steps: Array<{
+      id: string;
+      title: string;
+      state: "running" | "done" | "error";
+      durationMs?: number;
+      detail?: string;
+    }>;
+    model: string;
+  }> => {
+    const res = await api.post(`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/chat`, payload);
+    return res.data;
+  },
 };
 
 export const dashboardApi = {
