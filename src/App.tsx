@@ -3,11 +3,31 @@ import { AuthenticateWithRedirectCallback, useUser, useClerk } from "@clerk/reac
 import DemoOne from "@/components/ui/demo";
 import { SmokeLogin } from "@/components/ui/smoke-login";
 import { DashboardPage } from "@/components/ui/dashboard-page";
+import { PublicRepoView } from "@/components/ui/public-repo-view";
 import { CommandPalette } from "@/components/ui/command-palette";
 import { VoiceAgentProvider } from "@/context/VoiceAgentContext";
 import { authApi } from "@/lib/api";
 
-type Page = "home" | "login" | "signup" | "dashboard";
+type Page = "home" | "login" | "signup" | "dashboard" | "repo";
+
+function parseRepoRoute(): { owner: string; repoName: string } | null {
+  if (typeof window === "undefined") return null;
+  const hash = window.location.hash.replace(/^#/, "");
+  if (hash.toLowerCase().startsWith("repo/")) {
+    const parts = hash.slice(5).split("/").filter(Boolean);
+    if (parts.length >= 2) {
+      return { owner: decodeURIComponent(parts[0]), repoName: decodeURIComponent(parts[1]) };
+    }
+  }
+  const pathParts = window.location.pathname.split("/").filter(Boolean);
+  if (
+    pathParts.length === 2 &&
+    !["sso-callback", "assets", "api"].includes(pathParts[0].toLowerCase())
+  ) {
+    return { owner: decodeURIComponent(pathParts[0]), repoName: decodeURIComponent(pathParts[1]) };
+  }
+  return null;
+}
 
 function AppContent() {
   const { isSignedIn, user, isLoaded } = useUser();
@@ -17,8 +37,13 @@ function AppContent() {
     return stored?.email || "alex.chen@mygit.dev";
   });
 
+  const [repoTarget, setRepoTarget] = useState<{ owner: string; repoName: string } | null>(() =>
+    parseRepoRoute()
+  );
+
   const [page, setPage] = useState<Page>(() => {
     if (typeof window !== "undefined") {
+      if (parseRepoRoute()) return "repo";
       const hash = window.location.hash.replace("#", "").toLowerCase();
       if (hash === "login") return "login";
       if (hash === "signup" || hash === "sign-up") return "signup";
@@ -36,6 +61,13 @@ function AppContent() {
 
   useEffect(() => {
     const handleHashChange = () => {
+      const parsed = parseRepoRoute();
+      if (parsed) {
+        setRepoTarget(parsed);
+        setPage("repo");
+        return;
+      }
+      setRepoTarget(null);
       const hash = window.location.hash.replace("#", "").toLowerCase();
       if (hash === "login") setPage("login");
       else if (hash === "signup" || hash === "sign-up") setPage("signup");
@@ -44,7 +76,11 @@ function AppContent() {
     };
 
     window.addEventListener("hashchange", handleHashChange);
-    return () => window.removeEventListener("hashchange", handleHashChange);
+    window.addEventListener("popstate", handleHashChange);
+    return () => {
+      window.removeEventListener("hashchange", handleHashChange);
+      window.removeEventListener("popstate", handleHashChange);
+    };
   }, []);
 
   // Sync user email when Clerk signs in
@@ -60,8 +96,10 @@ function AppContent() {
   const navigate = (nextPage: Page) => {
     setPage(nextPage);
     if (nextPage === "home") {
-      window.history.pushState(null, "", window.location.pathname);
-    } else {
+      setRepoTarget(null);
+      window.history.pushState(null, "", "/");
+    } else if (nextPage !== "repo") {
+      setRepoTarget(null);
       window.location.hash = nextPage;
     }
   };
@@ -81,6 +119,17 @@ function AppContent() {
           />
         </div>
       </div>
+    );
+  }
+
+  if (page === "repo" && repoTarget) {
+    return (
+      <PublicRepoView
+        owner={repoTarget.owner}
+        repoName={repoTarget.repoName}
+        onBackHome={() => navigate("home")}
+        onLogin={() => navigate("login")}
+      />
     );
   }
 

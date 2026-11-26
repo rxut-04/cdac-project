@@ -46,6 +46,7 @@ import {
   AlertTriangle,
   Pencil,
   X,
+  Share2,
 } from "lucide-react";
 
 export interface RepoFileExplorerProps {
@@ -390,6 +391,10 @@ export function RepoFileExplorer({
   const [currentDescription, setCurrentDescription] = useState(initialDescription || "");
   const [currentIsPrivate, setCurrentIsPrivate] = useState(initialIsPrivate);
   const [forkedFrom, setForkedFrom] = useState(initialForkedFrom);
+  const isOwner = Boolean(
+    currentUsername && ownerUsername && currentUsername.toLowerCase() === ownerUsername.toLowerCase()
+  );
+  const [shareCopied, setShareCopied] = useState(false);
 
   const initialFiles = useMemo(() => getInitialFilesForRepo(currentRepoName, ownerUsername), [currentRepoName, ownerUsername]);
   const [files, setFiles] = useState<RepoFile[]>(initialFiles);
@@ -973,6 +978,31 @@ export function RepoFileExplorer({
 
           {/* Top Actions: Star, Fork, and Code Dropdown */}
           <div className="flex items-center gap-2">
+            {/* Share Read-Only Link Button */}
+            <button
+              type="button"
+              onClick={() => {
+                const shareUrl = `${window.location.origin}/${ownerUsername}/${currentRepoName}`;
+                navigator.clipboard.writeText(shareUrl);
+                setShareCopied(true);
+                setTimeout(() => setShareCopied(false), 2000);
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border/50 bg-foreground/5 hover:bg-foreground/10 text-xs font-mono font-medium text-foreground/80 hover:text-foreground transition-all shadow-xs"
+              title="Copy shareable repository link"
+            >
+              {shareCopied ? (
+                <>
+                  <Check className="size-3.5 text-emerald-400" />
+                  <span className="text-emerald-400">Link copied</span>
+                </>
+              ) : (
+                <>
+                  <Share2 className="size-3.5 text-foreground/60" />
+                  <span>Share</span>
+                </>
+              )}
+            </button>
+
             {/* Star / Unstar Button */}
             <button
               type="button"
@@ -1286,24 +1316,26 @@ export function RepoFileExplorer({
               </span>
             </button>
 
-            {/* 5th Tab: Settings */}
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab("settings");
-                setSelectedCommitSha(null);
-                setSelectedPrNumber(null);
-                setSelectedIssueNumber(null);
-              }}
-              className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs font-medium transition-all ${
-                activeTab === "settings"
-                  ? "bg-foreground/15 text-foreground shadow-xs font-semibold"
-                  : "text-foreground/60 hover:text-foreground"
-              }`}
-            >
-              <Settings className="size-3.5 text-neutral-400" />
-              <span>Settings</span>
-            </button>
+            {/* 5th Tab: Settings (Owner only) */}
+            {isOwner && (
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab("settings");
+                  setSelectedCommitSha(null);
+                  setSelectedPrNumber(null);
+                  setSelectedIssueNumber(null);
+                }}
+                className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs font-medium transition-all ${
+                  activeTab === "settings"
+                    ? "bg-foreground/15 text-foreground shadow-xs font-semibold"
+                    : "text-foreground/60 hover:text-foreground"
+                }`}
+              >
+                <Settings className="size-3.5 text-neutral-400" />
+                <span>Settings</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -1360,33 +1392,41 @@ export function RepoFileExplorer({
                   {selectedFile ? selectedFile.path : "No file selected"}
                 </span>
                 <div className="flex items-center gap-1.5 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditorPath("");
-                      setEditorContent("");
-                      setEditorMessage("");
-                      setFileEditorOpen(true);
-                    }}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-border/60 bg-background hover:bg-foreground/10 text-xs font-medium text-foreground cursor-pointer transition-colors"
-                  >
-                    <Plus className="size-3" />
-                    <span>New File</span>
-                  </button>
-                  {selectedFile && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditorPath(selectedFile.path);
-                        setEditorContent(selectedFile.code);
-                        setEditorMessage(`Update ${selectedFile.path}`);
-                        setFileEditorOpen(true);
-                      }}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-border/60 bg-background hover:bg-foreground/10 text-xs font-medium text-foreground cursor-pointer transition-colors"
-                    >
-                      <Pencil className="size-3" />
-                      <span>Edit</span>
-                    </button>
+                  {isOwner ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditorPath("");
+                          setEditorContent("");
+                          setEditorMessage("");
+                          setFileEditorOpen(true);
+                        }}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-border/60 bg-background hover:bg-foreground/10 text-xs font-medium text-foreground cursor-pointer transition-colors"
+                      >
+                        <Plus className="size-3" />
+                        <span>New File</span>
+                      </button>
+                      {selectedFile && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditorPath(selectedFile.path);
+                            setEditorContent(selectedFile.code);
+                            setEditorMessage(`Update ${selectedFile.path}`);
+                            setFileEditorOpen(true);
+                          }}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-border/60 bg-background hover:bg-foreground/10 text-xs font-medium text-foreground cursor-pointer transition-colors"
+                        >
+                          <Pencil className="size-3" />
+                          <span>Edit</span>
+                        </button>
+                      )}
+                    </>
+                  ) : (
+                    <span className="text-[11px] font-mono px-2 py-0.5 rounded border border-border/40 bg-foreground/5 text-foreground/50">
+                      Read-only view
+                    </span>
                   )}
                 </div>
               </div>

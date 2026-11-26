@@ -117,6 +117,16 @@ export const repoApi = {
     return res.data;
   },
 
+  getByOwner: async (owner: string, name: string): Promise<RepositoryItem> => {
+    const res = await api.get<RepositoryItem>(`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`);
+    return res.data;
+  },
+
+  searchPublic: async (q = ""): Promise<any[]> => {
+    const res = await api.get<any[]>(`/repos/public`, { params: { q } });
+    return res.data;
+  },
+
   delete: async (name: string): Promise<void> => {
     await api.delete(`/repos/${encodeURIComponent(name)}`);
   },

@@ -225,6 +225,33 @@ export function DashboardPage({
   const [discussionComments, setDiscussionComments] = useState<any[]>([]);
   const [replyText, setReplyText] = useState("");
   const [importError, setImportError] = useState<string | null>(null);
+  const [exploreQuery, setExploreQuery] = useState("");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [exploreResults, setExploreResults] = useState<any[]>([]);
+  const [exploreLoading, setExploreLoading] = useState(false);
+
+  useEffect(() => {
+    if (active !== "/explore") return;
+    let cancelled = false;
+    setExploreLoading(true);
+    const timer = setTimeout(() => {
+      repoApi
+        .searchPublic(exploreQuery)
+        .then((list) => {
+          if (!cancelled) setExploreResults(Array.isArray(list) ? list : []);
+        })
+        .catch(() => {
+          if (!cancelled) setExploreResults([]);
+        })
+        .finally(() => {
+          if (!cancelled) setExploreLoading(false);
+        });
+    }, 200);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [active, exploreQuery]);
 
   const refreshDashboard = useCallback(async () => {
     try {
@@ -1285,6 +1312,109 @@ export function DashboardPage({
                         title="Delete repository"
                       >
                         <Trash2 className="size-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      // ---------------------------------------------------------
+      // EXPLORE PUBLIC REPOSITORIES VIEW
+      // ---------------------------------------------------------
+      case "/explore": {
+        return (
+          <div className="space-y-6 max-w-5xl">
+            <div className="border-b border-border/50 pb-5">
+              <h1 className="text-2xl font-bold text-foreground">Explore Public Repositories</h1>
+              <p className="text-xs text-foreground/50 font-mono mt-1">
+                Search public repositories across all mygit developers and inspect files in read-only mode
+              </p>
+            </div>
+
+            <div className="relative">
+              <Search className="size-4 text-foreground/40 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={exploreQuery}
+                onChange={(e) => setExploreQuery(e.target.value)}
+                placeholder="Search by repository name, owner username, or description..."
+                className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-border/50 bg-foreground/5 text-xs text-foreground font-mono outline-none focus:border-border"
+              />
+            </div>
+
+            {exploreLoading ? (
+              <div className="p-8 text-center text-xs font-mono text-foreground/50">Searching public repositories...</div>
+            ) : exploreResults.length === 0 ? (
+              <div className="p-10 rounded-xl border border-border/50 bg-foreground/5 text-center space-y-2">
+                <Globe className="size-8 text-foreground/30 mx-auto" />
+                <p className="text-sm font-semibold text-foreground">No public repositories found</p>
+                <p className="text-xs text-foreground/50 font-mono">Try another search query.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {exploreResults.map((repo) => (
+                  <div
+                    key={repo.id}
+                    className="p-5 rounded-xl border border-border/50 bg-foreground/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:border-border transition-colors"
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span
+                          onClick={() =>
+                            setSelectedRepoForTree({
+                              id: String(repo.id),
+                              name: repo.name,
+                              ownerUsername: repo.ownerUsername,
+                              isPrivate: repo.isPrivate,
+                              description: repo.description || "No description provided.",
+                            })
+                          }
+                          className="font-semibold text-sm text-foreground hover:underline cursor-pointer"
+                        >
+                          {repo.ownerUsername}/{repo.name}
+                        </span>
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded border border-border/50 text-foreground/50">
+                          Public
+                        </span>
+                      </div>
+                      <p className="text-xs text-foreground/60 max-w-xl">
+                        {repo.description || "No description provided."}
+                      </p>
+                      <div className="flex items-center gap-4 text-[11px] font-mono text-foreground/45 pt-1">
+                        <span>★ {repo.starsCount ?? 0}</span>
+                        <span>⑂ {repo.forksCount ?? 0}</span>
+                        <span>Updated {formatRelativeTime(repo.updatedAt)}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          copyToClipboard(`${window.location.origin}/${repo.ownerUsername}/${repo.name}`);
+                        }}
+                        className="px-3 py-1.5 rounded-md border border-border/50 bg-foreground/5 text-xs font-mono text-foreground/70 hover:text-foreground"
+                      >
+                        Share Link
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setSelectedRepoForTree({
+                            id: String(repo.id),
+                            name: repo.name,
+                            ownerUsername: repo.ownerUsername,
+                            isPrivate: repo.isPrivate,
+                            description: repo.description || "No description provided.",
+                          })
+                        }
+                        className="px-3 py-1.5 rounded-md bg-accent-pro text-white text-xs font-medium"
+                      >
+                        View Files
                       </button>
                     </div>
                   </div>
@@ -3489,6 +3619,17 @@ export function DashboardPage({
                 onClick={(e) => {
                   e.preventDefault();
                   setActive("/repositories");
+                  setMobileMenuOpen(false);
+                }}
+              />
+              <Sidebar001Item
+                href="/explore"
+                label="Explore Public Repos"
+                isActive={active === "/explore"}
+                onClick={(e) => {
+                  e.preventDefault();
+                  setActive("/explore");
+                  setSelectedRepoForTree(null);
                   setMobileMenuOpen(false);
                 }}
               />
