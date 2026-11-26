@@ -1,8 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { useState, useMemo, useEffect } from "react";
-import { repoApi, authApi } from "@/lib/api";
+import { useState, useMemo, useEffect, useCallback } from "react";
+import { repoApi, authApi, dashboardApi } from "@/lib/api";
 import { RepoFileExplorer } from "@/components/ui/repo-file-explorer";
 import { ContributionHeatmap } from "@/components/ui/contribution-heatmap";
 import {
@@ -124,311 +124,220 @@ export function DashboardPage({
   // DATA STORES & STATE
   // -------------------------------------------------------------
 
-  // Repositories State
+  const LANG_COLORS: Record<string, string> = {
+    Rust: "bg-orange-500",
+    TypeScript: "bg-blue-400",
+    JavaScript: "bg-yellow-400",
+    Java: "bg-red-400",
+    Go: "bg-cyan-400",
+    Python: "bg-emerald-400",
+    "C/C++": "bg-purple-400",
+    Markdown: "bg-amber-400",
+    Web: "bg-pink-400",
+    Git: "bg-foreground/40",
+  };
+
+  const formatRelativeTime = (iso?: string | null) => {
+    if (!iso) return "Recently";
+    const ts = new Date(iso).getTime();
+    if (Number.isNaN(ts)) return "Recently";
+    const diffSec = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+    if (diffSec < 60) return "Just now";
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin}m ago`;
+    const diffHr = Math.floor(diffMin / 60);
+    if (diffHr < 24) return `${diffHr}h ago`;
+    const diffDay = Math.floor(diffHr / 24);
+    if (diffDay < 30) return `${diffDay}d ago`;
+    return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  };
+
+  // Repositories & Live Dashboard State (100% fetched from PostgreSQL tables)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [selectedRepoForTree, setSelectedRepoForTree] = useState<any | null>(null);
-  const [repos, setRepos] = useState([
-    {
-      id: "1",
-      name: "mygit-kernel",
-      description: "High-performance byte-compatible git engine written in Rust with parallel packfile indexing.",
-      lang: "Rust",
-      langColor: "bg-orange-500",
-      stars: 18,
-      forks: 3,
-      isStarred: true,
-      updated: "24m ago",
-      isPrivate: false,
-      lastAction: "Pushed 24 minutes ago",
-    },
-    {
-      id: "2",
-      name: "cymatic-particle-ui",
-      description: "Acoustic 3D resonance visualizer, live GLSL domain warping shaders, and particle dynamics.",
-      lang: "TypeScript",
-      langColor: "bg-blue-400",
-      stars: 12,
-      forks: 2,
-      isStarred: true,
-      updated: "2h ago",
-      isPrivate: false,
-      lastAction: "Pushed 2 hours ago",
-    },
-    {
-      id: "3",
-      name: "auth-daemon",
-      description: "Zero-knowledge cryptographic session validator & distributed SSH key management service.",
-      lang: "Go",
-      langColor: "bg-cyan-400",
-      stars: 6,
-      forks: 1,
-      isStarred: false,
-      updated: "1d ago",
-      isPrivate: true,
-      lastAction: "Opened 1 day ago",
-    },
-    {
-      id: "4",
-      name: "docs-specifications",
-      description: "Protocol specs for wire protocol v2, delta compression algorithms, and CLI manual.",
-      lang: "MDX",
-      langColor: "bg-amber-400",
-      stars: 3,
-      forks: 0,
-      isStarred: false,
-      updated: "3d ago",
-      isPrivate: false,
-      lastAction: "Pushed 3 days ago",
-    },
-  ]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [repos, setRepos] = useState<any[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [notifications, setNotifications] = useState<any[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [pullRequests, setPullRequests] = useState<any[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [issues, setIssues] = useState<any[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [tokens, setTokens] = useState<any[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [sshKeys, setSshKeys] = useState<any[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [discussions, setDiscussions] = useState<any[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [activity, setActivity] = useState<any[]>([]);
+  const [activityFilter, setActivityFilter] = useState<string>("All");
+  const [dashboardStats, setDashboardStats] = useState<{
+    publicReposCount: number;
+    privateReposCount: number;
+    totalCommits: number;
+    commitsThisWeek: number;
+    totalStarsEarned: number;
+    openPullRequestsCount: number;
+    openIssuesCount: number;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    lastPush: any | null;
+  }>({
+    publicReposCount: 0,
+    privateReposCount: 0,
+    totalCommits: 0,
+    commitsThisWeek: 0,
+    totalStarsEarned: 0,
+    openPullRequestsCount: 0,
+    openIssuesCount: 0,
+    lastPush: null,
+  });
+  const [profileData, setProfileData] = useState<{
+    username: string;
+    email: string;
+    fullName?: string | null;
+    bio?: string | null;
+    location?: string | null;
+    website?: string | null;
+    createdAt?: string | null;
+  }>({
+    username,
+    email: userEmail,
+  });
+  const [editProfileOpen, setEditProfileOpen] = useState(false);
+  const [profileForm, setProfileForm] = useState({ fullName: "", bio: "", location: "", website: "" });
+  const [newDiscussionOpen, setNewDiscussionOpen] = useState(false);
+  const [discussionForm, setDiscussionForm] = useState({ title: "", body: "", category: "General" });
 
-  // Sync repositories from Spring Boot backend (Neon PostgreSQL)
-  useEffect(() => {
-    let isMounted = true;
-    repoApi
-      .list()
-      .then((backendRepos) => {
-        if (!isMounted) return;
-        if (Array.isArray(backendRepos)) {
-          const mapped = backendRepos.map((r: any) => ({
+  const refreshDashboard = useCallback(async () => {
+    try {
+      const [summary, tokenList, sshList, discList] = await Promise.all([
+        dashboardApi.getSummary(),
+        dashboardApi.listTokens().catch(() => []),
+        dashboardApi.listSshKeys().catch(() => []),
+        dashboardApi.listDiscussions().catch(() => []),
+      ]);
+
+      if (summary && Array.isArray(summary.repos)) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const mappedRepos = summary.repos.map((r: any) => {
+          const lang = r.primaryLanguage || "Git";
+          return {
             id: String(r.id),
             name: r.name,
             description: r.description || "No description provided.",
-            lang: "Rust",
-            langColor: "bg-orange-500",
+            lang,
+            langColor: LANG_COLORS[lang] || "bg-foreground/40",
             stars: r.starsCount || 0,
             forks: r.forksCount || 0,
-            isStarred: false,
-            updated: "Just now",
-            isPrivate: r.isPrivate,
-            ownerUsername: r.ownerUsername,
+            isStarred: Boolean(r.isStarred),
+            updated: formatRelativeTime(r.updatedAt),
+            isPrivate: Boolean(r.isPrivate),
+            ownerUsername: r.ownerUsername || username,
             forkedFrom: r.forkedFrom,
-            lastAction: r.forkedFrom ? `Forked from @${r.forkedFrom}` : "Created in Neon Cloud",
-          }));
-          setRepos(mapped);
+            lastAction: r.lastCommitMessage
+              ? `Commit: ${r.lastCommitMessage}`
+              : r.forkedFrom
+              ? `Forked from @${r.forkedFrom}`
+              : `Updated ${formatRelativeTime(r.updatedAt)}`,
+          };
+        });
+        setRepos(mappedRepos);
+      }
+
+      if (summary) {
+        setDashboardStats({
+          publicReposCount: summary.publicReposCount ?? 0,
+          privateReposCount: summary.privateReposCount ?? 0,
+          totalCommits: summary.totalCommits ?? 0,
+          commitsThisWeek: summary.commitsThisWeek ?? 0,
+          totalStarsEarned: summary.totalStarsEarned ?? 0,
+          openPullRequestsCount: summary.openPullRequestsCount ?? 0,
+          openIssuesCount: summary.openIssuesCount ?? 0,
+          lastPush: summary.lastPush ?? null,
+        });
+
+        if (Array.isArray(summary.pullRequests)) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          setPullRequests(summary.pullRequests.map((pr: any) => ({
+            ...pr,
+            status: pr.status === "OPEN" ? "Open" : pr.status === "MERGED" ? "Merged" : "Closed",
+            time: formatRelativeTime(pr.updatedAt || pr.createdAt),
+          })));
         }
-      })
-      .catch((err) => {
-        console.debug("Backend repo sync error:", err);
-      });
 
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+        if (Array.isArray(summary.issues)) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          setIssues(summary.issues.map((i: any) => ({
+            ...i,
+            status: i.status === "OPEN" ? "Open" : "Closed",
+            labels: Array.isArray(i.labels) ? i.labels : [],
+            time: formatRelativeTime(i.updatedAt || i.createdAt),
+          })));
+        }
 
-  // Notifications State
-  const [notifications, setNotifications] = useState([
-    {
-      id: "n1",
-      type: "pr",
-      repo: "mygit-kernel",
-      message: "Torvalds requested changes on PR #14: 'packfile delta compression v2'",
-      time: "24m ago",
-      unread: true,
-      category: "review",
-    },
-    {
-      id: "n2",
-      type: "mention",
-      repo: "cymatic-particle-ui",
-      message: "@sarah mentioned you in issue #9: 'Shader pipeline stalls on WebGL 1 fallback'",
-      time: "1h ago",
-      unread: true,
-      category: "mentioned",
-    },
-    {
-      id: "n3",
-      type: "security",
-      repo: "auth-daemon",
-      message: "Automated scan verified zero dependency vulnerabilities in Ed25519 module",
-      time: "3h ago",
-      unread: true,
-      category: "all",
-    },
-    {
-      id: "n4",
-      type: "pr",
-      repo: "mygit-kernel",
-      message: "PR #12: 'boundary checks on loose object unpacker' merged by CI runner",
-      time: "5h ago",
-      unread: false,
-      category: "all",
-    },
-    {
-      id: "n5",
-      type: "star",
-      repo: "mygit-kernel",
-      message: "@kesslau starred your repository mygit-kernel",
-      time: "1d ago",
-      unread: false,
-      category: "all",
-    },
-  ]);
+        if (Array.isArray(summary.activity)) {
+          setActivity(summary.activity);
+        }
 
-  // Pull Requests State
-  const [pullRequests, setPullRequests] = useState([
-    {
-      id: 14,
-      title: "feat: add packfile delta compression v2 with streaming unpacker",
-      repo: "mygit-kernel",
-      author: username,
-      status: "Open",
-      comments: 6,
-      time: "2 hours ago",
-      type: "created",
-      needsReview: true,
-    },
-    {
-      id: 11,
-      title: "refactor: optimize memory pool allocation during loose object hashing",
-      repo: "cymatic-particle-ui",
-      author: "kesslau",
-      status: "Open",
-      comments: 3,
-      time: "4 hours ago",
-      type: "review_requested",
-      needsReview: true,
-    },
-    {
-      id: 12,
-      title: "fix: boundary checks on loose object unpacker buffer underflow",
-      repo: "mygit-kernel",
-      author: username,
-      status: "Merged",
-      comments: 8,
-      time: "5 hours ago",
-      type: "created",
-      needsReview: false,
-    },
-    {
-      id: 7,
-      title: "perf: vector SIMD implementation for SHA-1 and SHA-256 rolling hash",
-      repo: "auth-daemon",
-      author: "torvalds",
-      status: "Closed",
-      comments: 12,
-      time: "2 days ago",
-      type: "assigned",
-      needsReview: false,
-    },
-  ]);
+        if (Array.isArray(summary.notifications)) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          setNotifications(summary.notifications.map((n: any) => ({
+            ...n,
+            time: formatRelativeTime(n.timestamp),
+          })));
+        }
 
-  // Issues State
-  const [issues, setIssues] = useState([
-    {
-      id: 28,
-      title: "Crash on corrupted pack index v2 with truncated checksum trailer",
-      repo: "mygit-kernel",
-      author: "alex",
-      status: "Open",
-      labels: ["bug", "priority-high"],
-      comments: 4,
-      time: "3 hours ago",
-      type: "assigned",
-    },
-    {
-      id: 24,
-      title: "Support Apple Silicon hardware accelerated SHA-256 instructions",
-      repo: "mygit-kernel",
-      author: "alex",
-      status: "Open",
-      labels: ["enhancement", "performance"],
-      comments: 7,
-      time: "1 day ago",
-      type: "created",
-    },
-    {
-      id: 19,
-      title: "Documentation: specify wire protocol v2 handshake negotiation flow",
-      repo: "docs-specifications",
-      author: "sophie",
-      status: "Open",
-      labels: ["documentation"],
-      comments: 2,
-      time: "2 days ago",
-      type: "mentioned",
-    },
-    {
-      id: 15,
-      title: "WebSocket transport reconnection backoff policy jitter",
-      repo: "cymatic-particle-ui",
-      author: "alex",
-      status: "Closed",
-      labels: ["bug"],
-      comments: 9,
-      time: "4 days ago",
-      type: "created",
-    },
-  ]);
+        if (summary.profile) {
+          setProfileData(summary.profile);
+          setProfileForm({
+            fullName: summary.profile.fullName || "",
+            bio: summary.profile.bio || "",
+            location: summary.profile.location || "",
+            website: summary.profile.website || "",
+          });
+        }
+      }
 
-  // Tokens State
-  const [tokens, setTokens] = useState([
-    {
-      id: "t1",
-      name: "macbook-terminal-cli",
-      scopes: ["repo:read", "repo:write"],
-      created: "Nov 12, 2026",
-      lastUsed: "24m ago",
-      expires: "90 days",
-      tokenString: "mygit_pat_8feca4291034279b35c91b3b",
-    },
-    {
-      id: "t2",
-      name: "github-actions-sync-agent",
-      scopes: ["repo:read"],
-      created: "Oct 28, 2026",
-      lastUsed: "2h ago",
-      expires: "30 days",
-      tokenString: "mygit_pat_91034279b35c91b3b8feca42",
-    },
-  ]);
+      if (Array.isArray(tokenList)) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setTokens(tokenList.map((t: any) => ({
+          ...t,
+          id: String(t.id),
+          created: formatRelativeTime(t.createdAt),
+          lastUsed: t.lastUsedAt ? formatRelativeTime(t.lastUsedAt) : "Never",
+        })));
+      }
 
-  // SSH Keys State
-  const [sshKeys, setSshKeys] = useState([
-    {
-      id: "k1",
-      title: "Personal M3 Max MacBook",
-      fingerprint: "SHA256:7f2b15f61cc746508213e5a668644b67",
-      added: "Nov 01, 2026",
-      lastUsed: "24m ago",
-    },
-    {
-      id: "k2",
-      title: "Linux Devbox Workstation",
-      fingerprint: "SHA256:8feca4204e5ba11a6ed8b1173f9db734",
-      added: "Oct 15, 2026",
-      lastUsed: "2d ago",
-    },
-  ]);
+      if (Array.isArray(sshList)) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setSshKeys(sshList.map((k: any) => ({
+          ...k,
+          id: String(k.id),
+          added: formatRelativeTime(k.createdAt),
+          lastUsed: k.lastUsedAt ? formatRelativeTime(k.lastUsedAt) : "Never",
+        })));
+      }
 
-  // Discussions State
-  const [discussions] = useState([
-    {
-      id: "d1",
-      title: "RFC: Implementing streaming delta compression for zero-copy git clone",
-      category: "Ideas",
-      author: username,
-      replies: 14,
-      lastActivity: "1h ago",
-    },
-    {
-      id: "d2",
-      title: "How to configure custom SSH ports for self-hosted edge mirrors?",
-      category: "Q&A",
-      author: "marcus_dev",
-      replies: 8,
-      lastActivity: "4h ago",
-    },
-    {
-      id: "d3",
-      title: "v1.1.0 Roadmap Announcement: Rust Kernel delta unpacker & WASM support",
-      category: "Announcements",
-      author: "mygit-team",
-      replies: 29,
-      lastActivity: "1d ago",
-    },
-  ]);
+      if (Array.isArray(discList)) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setDiscussions(discList.map((d: any) => ({
+          ...d,
+          id: String(d.id),
+          lastActivity: formatRelativeTime(d.updatedAt || d.createdAt),
+        })));
+      }
+    } catch (err) {
+      console.debug("Dashboard summary sync error:", err);
+    }
+  }, [username, userEmail]);
+
+  useEffect(() => {
+    refreshDashboard();
+    const onFocus = () => refreshDashboard();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [refreshDashboard]);
 
   // Contribution heatmap (52 weeks x 7 days)
   const heatmapData = useMemo(() => {
@@ -607,22 +516,30 @@ export function DashboardPage({
   const [newTokenScopes, setNewTokenScopes] = useState<string[]>(["repo:read", "repo:write"]);
   const [justGeneratedToken, setJustGeneratedToken] = useState<string | null>(null);
 
-  const handleGenerateToken = (e: React.FormEvent) => {
+  const handleGenerateToken = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTokenName.trim()) return;
-    const generated = "mygit_pat_" + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
-    const newT = {
-      id: String(Date.now()),
-      name: newTokenName.trim(),
-      scopes: newTokenScopes,
-      created: "Just now",
-      lastUsed: "Never",
-      expires: newTokenExpiry,
-      tokenString: generated,
-    };
-    setTokens((prev) => [newT, ...prev]);
-    setJustGeneratedToken(generated);
-    setNewTokenName("");
+    try {
+      const created = await dashboardApi.createToken({
+        name: newTokenName.trim(),
+        expires: newTokenExpiry,
+        scopes: newTokenScopes.join(","),
+      });
+      setTokens((prev) => [
+        {
+          ...created,
+          id: String(created.id),
+          created: "Just now",
+          lastUsed: "Never",
+        },
+        ...prev,
+      ]);
+      setJustGeneratedToken(created.tokenString);
+      setNewTokenName("");
+      showToast("Personal access token created.");
+    } catch {
+      showToast("Failed to create token.");
+    }
   };
 
   // -------------------------------------------------------------
@@ -636,21 +553,59 @@ export function DashboardPage({
     newSshKey.trim().startsWith("ssh-rsa") ||
     newSshKey.trim().startsWith("ecdsa-sha2");
 
-  const handleAddSshKey = (e: React.FormEvent) => {
+  const handleAddSshKey = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newSshTitle.trim() || !isValidSsh) return;
-    const keyItem = {
-      id: String(Date.now()),
-      title: newSshTitle.trim(),
-      fingerprint: "SHA256:" + Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 10),
-      added: "Just now",
-      lastUsed: "Never",
-    };
-    setSshKeys((prev) => [keyItem, ...prev]);
-    setNewSshTitle("");
-    setNewSshKey("");
-    setShowSshModal(false);
-    showToast("SSH key added successfully!");
+    try {
+      const saved = await dashboardApi.addSshKey({
+        title: newSshTitle.trim(),
+        publicKey: newSshKey.trim(),
+      });
+      setSshKeys((prev) => [
+        {
+          ...saved,
+          id: String(saved.id),
+          added: "Just now",
+          lastUsed: "Never",
+        },
+        ...prev,
+      ]);
+      setNewSshTitle("");
+      setNewSshKey("");
+      setShowSshModal(false);
+      showToast("SSH key added successfully!");
+    } catch {
+      showToast("Failed to save SSH key.");
+    }
+  };
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const updated = await dashboardApi.updateProfile(profileForm);
+      setProfileData(updated);
+      setEditProfileOpen(false);
+      showToast("Profile updated.");
+    } catch {
+      showToast("Failed to update profile.");
+    }
+  };
+
+  const handleCreateDiscussion = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!discussionForm.title.trim()) return;
+    try {
+      const created = await dashboardApi.createDiscussion(discussionForm);
+      setDiscussions((prev) => [
+        { ...created, id: String(created.id), lastActivity: "Just now" },
+        ...prev,
+      ]);
+      setDiscussionForm({ title: "", body: "", category: "General" });
+      setNewDiscussionOpen(false);
+      showToast("Discussion posted.");
+    } catch {
+      showToast("Failed to post discussion.");
+    }
   };
 
   // -------------------------------------------------------------
@@ -723,13 +678,22 @@ export function DashboardPage({
       // 1. ACTIVITY VIEW
       // ---------------------------------------------------------
       case "/activity": {
+        const filteredActivity = activity.filter((a) => {
+          if (activityFilter === "All") return true;
+          if (activityFilter === "Pushes") return a.type === "push";
+          if (activityFilter === "Issues") return a.type === "issue";
+          if (activityFilter === "Pull Requests") return a.type === "pr";
+          if (activityFilter === "Stars") return a.type === "star";
+          return true;
+        });
+
         return (
           <div className="space-y-6 max-w-4xl">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/50 pb-5">
               <div>
                 <h1 className="text-2xl font-bold text-foreground">Activity Timeline</h1>
                 <p className="text-xs text-foreground/50 font-mono mt-1">
-                  Chronological event audit of your commits, pull requests, and edge pushes
+                  Chronological event audit of your commits, pull requests, issues, and stars
                 </p>
               </div>
               <div className="flex items-center gap-1.5 p-1 rounded-md border border-border/50 bg-foreground/5 text-xs">
@@ -737,7 +701,12 @@ export function DashboardPage({
                   <button
                     key={tab}
                     type="button"
-                    className="px-2.5 py-1 rounded text-xs text-foreground/70 hover:text-foreground hover:bg-foreground/10 transition-colors"
+                    onClick={() => setActivityFilter(tab)}
+                    className={`px-2.5 py-1 rounded text-xs transition-colors ${
+                      activityFilter === tab
+                        ? "bg-foreground/15 text-foreground font-medium"
+                        : "text-foreground/60 hover:text-foreground hover:bg-foreground/10"
+                    }`}
                   >
                     {tab}
                   </button>
@@ -745,98 +714,45 @@ export function DashboardPage({
               </div>
             </div>
 
-            {/* Date Grouping */}
-            <div className="space-y-6">
-              {/* Today */}
-              <div className="space-y-3">
-                <span className="text-xs font-mono text-foreground/40 uppercase tracking-wider">Today</span>
-                <div className="space-y-2 border-l border-border/50 pl-4 ml-2">
-                  <div className="p-3.5 rounded-lg border border-border/50 bg-foreground/5 flex items-start gap-3">
-                    <GitBranch className="size-4 text-emerald-400 mt-0.5 shrink-0" />
+            {filteredActivity.length === 0 ? (
+              <div className="p-10 rounded-xl border border-border/50 bg-foreground/5 text-center space-y-2">
+                <p className="text-sm font-medium text-foreground">No recorded activity yet</p>
+                <p className="text-xs text-foreground/50 font-mono">
+                  Push a commit, open an issue/PR, or star a repository to see live events here.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2 border-l border-border/50 pl-4 ml-2">
+                {filteredActivity.map((item) => (
+                  <div key={item.id} className="p-3.5 rounded-lg border border-border/50 bg-foreground/5 flex items-start gap-3">
+                    {item.type === "push" && <GitBranch className="size-4 text-emerald-400 mt-0.5 shrink-0" />}
+                    {item.type === "pr" && <GitPullRequest className="size-4 text-accent-pro mt-0.5 shrink-0" />}
+                    {item.type === "issue" && <AlertCircle className="size-4 text-amber-400 mt-0.5 shrink-0" />}
+                    {item.type === "star" && <Star className="size-4 text-yellow-400 mt-0.5 shrink-0" />}
                     <div className="space-y-0.5 flex-1">
                       <p className="text-sm text-foreground">
-                        You pushed 3 commits to <span className="font-semibold">mygit-kernel:main</span>
+                        {item.type === "push" && (
+                          <>Pushed commit to <span className="font-semibold">{item.repo}:{item.branch || "main"}</span> — {item.title}</>
+                        )}
+                        {item.type === "pr" && (
+                          <>PR #{item.number} ({item.status}): <span className="font-semibold">{item.title}</span></>
+                        )}
+                        {item.type === "issue" && (
+                          <>Issue #{item.number} ({item.status}): <span className="font-semibold">{item.title}</span></>
+                        )}
+                        {item.type === "star" && <>{item.title}</>}
                       </p>
                       <p className="text-xs text-foreground/45 font-mono">
-                        commit <code className="text-foreground/70">8feca42</code> · 24 minutes ago
+                        {item.repo}
+                        {item.sha ? <> · <code className="text-foreground/70">{String(item.sha).slice(0, 7)}</code></> : null}
+                        {" · "}
+                        {formatRelativeTime(item.timestamp)}
                       </p>
                     </div>
                   </div>
-
-                  <div className="p-3.5 rounded-lg border border-border/50 bg-foreground/5 flex items-start gap-3">
-                    <GitPullRequest className="size-4 text-accent-pro mt-0.5 shrink-0" />
-                    <div className="space-y-0.5 flex-1">
-                      <p className="text-sm text-foreground">
-                        Opened Pull Request #14: <span className="font-semibold">feat: add packfile delta compression v2</span>
-                      </p>
-                      <p className="text-xs text-foreground/45 font-mono">mygit-kernel · 2 hours ago</p>
-                    </div>
-                  </div>
-
-                  <div className="p-3.5 rounded-lg border border-border/50 bg-foreground/5 flex items-start gap-3">
-                    <CheckCircle2 className="size-4 text-blue-400 mt-0.5 shrink-0" />
-                    <div className="space-y-0.5 flex-1">
-                      <p className="text-sm text-foreground">
-                        Approved Pull Request #11: <span className="font-semibold">refactor: memory pool allocator</span>
-                      </p>
-                      <p className="text-xs text-foreground/45 font-mono">cymatic-particle-ui · 4 hours ago</p>
-                    </div>
-                  </div>
-                </div>
+                ))}
               </div>
-
-              {/* Yesterday */}
-              <div className="space-y-3">
-                <span className="text-xs font-mono text-foreground/40 uppercase tracking-wider">Yesterday</span>
-                <div className="space-y-2 border-l border-border/50 pl-4 ml-2">
-                  <div className="p-3.5 rounded-lg border border-border/50 bg-foreground/5 flex items-start gap-3">
-                    <Layers className="size-4 text-purple-400 mt-0.5 shrink-0" />
-                    <div className="space-y-0.5 flex-1">
-                      <p className="text-sm text-foreground">
-                        Merged PR #12: <span className="font-semibold">fix: boundary checks on loose object unpacker</span>
-                      </p>
-                      <p className="text-xs text-foreground/45 font-mono">mygit-kernel · 1 day ago</p>
-                    </div>
-                  </div>
-
-                  <div className="p-3.5 rounded-lg border border-border/50 bg-foreground/5 flex items-start gap-3">
-                    <AlertCircle className="size-4 text-amber-400 mt-0.5 shrink-0" />
-                    <div className="space-y-0.5 flex-1">
-                      <p className="text-sm text-foreground">
-                        Closed issue #8: <span className="font-semibold">memory leak in packfile delta cache</span>
-                      </p>
-                      <p className="text-xs text-foreground/45 font-mono">mygit-kernel · 1 day ago</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* This week */}
-              <div className="space-y-3">
-                <span className="text-xs font-mono text-foreground/40 uppercase tracking-wider">This week</span>
-                <div className="space-y-2 border-l border-border/50 pl-4 ml-2">
-                  <div className="p-3.5 rounded-lg border border-border/50 bg-foreground/5 flex items-start gap-3">
-                    <Star className="size-4 text-yellow-400 mt-0.5 shrink-0" />
-                    <div className="space-y-0.5 flex-1">
-                      <p className="text-sm text-foreground">
-                        Starred repository <span className="font-semibold">torvalds/linux</span>
-                      </p>
-                      <p className="text-xs text-foreground/45 font-mono">3 days ago</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="pt-2">
-              <button
-                type="button"
-                onClick={() => showToast("Loaded earlier activity records.")}
-                className="w-full py-2.5 rounded-lg border border-border/50 bg-foreground/5 text-xs text-foreground/70 hover:text-foreground hover:bg-foreground/10 font-mono transition-colors"
-              >
-                Load more activity...
-              </button>
-            </div>
+            )}
           </div>
         );
       }
@@ -1728,55 +1644,68 @@ export function DashboardPage({
 
             {/* PR Rows */}
             <div className="space-y-2.5">
-              {pullRequests.map((pr) => (
-                <div
-                  key={pr.id}
-                  className="p-4 rounded-xl border border-border/50 bg-foreground/5 flex items-start justify-between gap-4"
-                >
-                  <div className="flex items-start gap-3">
-                    <GitPullRequest
-                      className={`size-4 mt-0.5 shrink-0 ${
-                        pr.status === "Open"
-                          ? "text-emerald-400"
-                          : pr.status === "Merged"
-                          ? "text-purple-400"
-                          : "text-foreground/40"
-                      }`}
-                    />
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-semibold text-sm text-foreground hover:underline cursor-pointer">
-                          {pr.title}
-                        </span>
-                        <span
-                          className={`text-[10px] font-mono px-2 py-0.2 rounded-full border ${
-                            pr.status === "Open"
-                              ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
-                              : pr.status === "Merged"
-                              ? "bg-purple-500/10 text-purple-400 border-purple-500/30"
-                              : "bg-foreground/10 text-foreground/50 border-border/50"
-                          }`}
-                        >
-                          {pr.status}
-                        </span>
-                        {pr.needsReview && (
-                          <span className="text-[10px] font-mono px-1.5 rounded bg-accent-pro/15 text-accent-pro border border-accent-pro/30">
-                            Needs review
+              {pullRequests.length === 0 ? (
+                <div className="p-10 rounded-xl border border-border/50 bg-foreground/5 text-center space-y-2">
+                  <p className="text-sm font-medium text-foreground">No pull requests yet</p>
+                  <p className="text-xs text-foreground/50 font-mono">
+                    Open a repository and create a pull request to see it tracked here.
+                  </p>
+                </div>
+              ) : (
+                pullRequests.map((pr) => (
+                  <div
+                    key={pr.id}
+                    onClick={() => {
+                      const target = repos.find((r) => r.name === pr.repo);
+                      if (target) setSelectedRepoForTree(target);
+                    }}
+                    className="p-4 rounded-xl border border-border/50 bg-foreground/5 flex items-start justify-between gap-4 cursor-pointer hover:border-border transition-colors"
+                  >
+                    <div className="flex items-start gap-3">
+                      <GitPullRequest
+                        className={`size-4 mt-0.5 shrink-0 ${
+                          pr.status === "Open"
+                            ? "text-emerald-400"
+                            : pr.status === "Merged"
+                            ? "text-purple-400"
+                            : "text-foreground/40"
+                        }`}
+                      />
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold text-sm text-foreground hover:underline">
+                            {pr.title}
                           </span>
-                        )}
+                          <span
+                            className={`text-[10px] font-mono px-2 py-0.2 rounded-full border ${
+                              pr.status === "Open"
+                                ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                                : pr.status === "Merged"
+                                ? "bg-purple-500/10 text-purple-400 border-purple-500/30"
+                                : "bg-foreground/10 text-foreground/50 border-border/50"
+                            }`}
+                          >
+                            {pr.status}
+                          </span>
+                          {pr.needsReview && (
+                            <span className="text-[10px] font-mono px-1.5 rounded bg-accent-pro/15 text-accent-pro border border-accent-pro/30">
+                              Needs review
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-foreground/45 font-mono">
+                          #{pr.prNumber || pr.id} opened {pr.time} by {pr.author} · {pr.repo}
+                        </p>
                       </div>
-                      <p className="text-xs text-foreground/45 font-mono">
-                        #{pr.id} opened {pr.time} by {pr.author} · {pr.repo}
-                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 text-xs text-foreground/40 font-mono shrink-0">
+                      <MessageSquare className="size-3.5" />
+                      <span>{pr.comments}</span>
                     </div>
                   </div>
-
-                  <div className="flex items-center gap-1.5 text-xs text-foreground/40 font-mono shrink-0">
-                    <MessageSquare className="size-3.5" />
-                    <span>{pr.comments}</span>
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         );
@@ -1807,43 +1736,56 @@ export function DashboardPage({
             </div>
 
             <div className="space-y-2.5">
-              {issues.map((issue) => (
-                <div
-                  key={issue.id}
-                  className="p-4 rounded-xl border border-border/50 bg-foreground/5 flex items-start justify-between gap-4"
-                >
-                  <div className="flex items-start gap-3">
-                    <AlertCircle
-                      className={`size-4 mt-0.5 shrink-0 ${
-                        issue.status === "Open" ? "text-emerald-400" : "text-purple-400"
-                      }`}
-                    />
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-semibold text-sm text-foreground hover:underline cursor-pointer">
-                          {issue.title}
-                        </span>
-                        {issue.labels.map((lbl) => (
-                          <span
-                            key={lbl}
-                            className="text-[10px] font-mono px-2 py-0.2 rounded border border-border/50 text-foreground/60 bg-foreground/5"
-                          >
-                            {lbl}
+              {issues.length === 0 ? (
+                <div className="p-10 rounded-xl border border-border/50 bg-foreground/5 text-center space-y-2">
+                  <p className="text-sm font-medium text-foreground">No issues found</p>
+                  <p className="text-xs text-foreground/50 font-mono">
+                    Open a repository and create an issue to track bugs or tasks here.
+                  </p>
+                </div>
+              ) : (
+                issues.map((issue) => (
+                  <div
+                    key={issue.id}
+                    onClick={() => {
+                      const target = repos.find((r) => r.name === issue.repo);
+                      if (target) setSelectedRepoForTree(target);
+                    }}
+                    className="p-4 rounded-xl border border-border/50 bg-foreground/5 flex items-start justify-between gap-4 cursor-pointer hover:border-border transition-colors"
+                  >
+                    <div className="flex items-start gap-3">
+                      <AlertCircle
+                        className={`size-4 mt-0.5 shrink-0 ${
+                          issue.status === "Open" ? "text-emerald-400" : "text-purple-400"
+                        }`}
+                      />
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold text-sm text-foreground hover:underline">
+                            {issue.title}
                           </span>
-                        ))}
+                          {issue.labels.map((lbl: string) => (
+                            <span
+                              key={lbl}
+                              className="text-[10px] font-mono px-2 py-0.2 rounded border border-border/50 text-foreground/60 bg-foreground/5"
+                            >
+                              {lbl}
+                            </span>
+                          ))}
+                        </div>
+                        <p className="text-xs text-foreground/45 font-mono">
+                          #{issue.issueNumber || issue.id} opened {issue.time} by {issue.author} · {issue.repo}
+                        </p>
                       </div>
-                      <p className="text-xs text-foreground/45 font-mono">
-                        #{issue.id} opened {issue.time} by {issue.author} · {issue.repo}
-                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 text-xs text-foreground/40 font-mono shrink-0">
+                      <MessageSquare className="size-3.5" />
+                      <span>{issue.comments}</span>
                     </div>
                   </div>
-
-                  <div className="flex items-center gap-1.5 text-xs text-foreground/40 font-mono shrink-0">
-                    <MessageSquare className="size-3.5" />
-                    <span>{issue.comments}</span>
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         );
@@ -1853,56 +1795,69 @@ export function DashboardPage({
       // 11. REVIEWS VIEW
       // ---------------------------------------------------------
       case "/reviews": {
+        const openReviewPrs = pullRequests.filter((pr) => pr.status === "Open");
+        const completedPrs = pullRequests.filter((pr) => pr.status !== "Open");
         return (
           <div className="space-y-6 max-w-4xl">
             <div className="border-b border-border/50 pb-5">
               <h1 className="text-2xl font-bold text-foreground">Code Reviews</h1>
               <p className="text-xs text-foreground/50 font-mono mt-1">
-                Pull requests awaiting your review and recent review history
+                Open pull requests awaiting review and completed reviews across your repositories
               </p>
             </div>
 
-            <div className="space-y-3">
-              <div className="p-5 rounded-xl border border-accent-pro/30 bg-accent-pro/5 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-mono text-accent-pro font-medium">1 AWAITING YOUR REVIEW</span>
-                  <span className="text-xs font-mono text-foreground/40">mygit-kernel</span>
-                </div>
-                <h3 className="text-sm font-semibold text-foreground">
-                  #14 feat: add packfile delta compression v2 with streaming unpacker
-                </h3>
-                <p className="text-xs text-foreground/60">
-                  Requested by @torvalds · Changes: +412 / -89 across 6 files
+            {pullRequests.length === 0 ? (
+              <div className="p-10 rounded-xl border border-border/50 bg-foreground/5 text-center space-y-2">
+                <p className="text-sm font-medium text-foreground">No pull requests to review</p>
+                <p className="text-xs text-foreground/50 font-mono">
+                  When pull requests are opened on your repositories, they will appear here.
                 </p>
-                <div className="pt-1 flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => showToast("Opening diff viewer...")}
-                    className="px-3.5 py-1.5 rounded-md bg-accent-pro text-white text-xs font-medium"
-                  >
-                    Jump to Diff
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => showToast("Review approved.")}
-                    className="px-3 py-1.5 rounded-md border border-border/50 text-xs text-foreground/70 hover:text-foreground"
-                  >
-                    Approve
-                  </button>
-                </div>
               </div>
+            ) : (
+              <div className="space-y-3">
+                {openReviewPrs.map((pr) => (
+                  <div key={pr.id} className="p-5 rounded-xl border border-accent-pro/30 bg-accent-pro/5 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-mono text-accent-pro font-medium">AWAITING REVIEW</span>
+                      <span className="text-xs font-mono text-foreground/40">{pr.repo}</span>
+                    </div>
+                    <h3 className="text-sm font-semibold text-foreground">
+                      #{pr.prNumber || pr.id} {pr.title}
+                    </h3>
+                    <p className="text-xs text-foreground/60">
+                      Opened by @{pr.author} · {pr.sourceBranch} → {pr.targetBranch} · {pr.time}
+                    </p>
+                    <div className="pt-1 flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const target = repos.find((r) => r.name === pr.repo);
+                          if (target) setSelectedRepoForTree(target);
+                        }}
+                        className="px-3.5 py-1.5 rounded-md bg-accent-pro text-white text-xs font-medium"
+                      >
+                        Open Repository
+                      </button>
+                    </div>
+                  </div>
+                ))}
 
-              <div className="p-5 rounded-xl border border-border/50 bg-foreground/5 space-y-2 opacity-80">
-                <div className="flex items-center justify-between text-xs font-mono text-emerald-400">
-                  <span>APPROVED BY YOU</span>
-                  <span className="text-foreground/40">cymatic-particle-ui</span>
-                </div>
-                <h3 className="text-sm font-semibold text-foreground">
-                  #11 refactor: optimize memory pool allocation during loose object hashing
-                </h3>
-                <p className="text-xs text-foreground/50">Reviewed 4 hours ago · All checks passed</p>
+                {completedPrs.map((pr) => (
+                  <div key={pr.id} className="p-5 rounded-xl border border-border/50 bg-foreground/5 space-y-2 opacity-85">
+                    <div className="flex items-center justify-between text-xs font-mono text-emerald-400">
+                      <span>{pr.status.toUpperCase()}</span>
+                      <span className="text-foreground/40">{pr.repo}</span>
+                    </div>
+                    <h3 className="text-sm font-semibold text-foreground">
+                      #{pr.prNumber || pr.id} {pr.title}
+                    </h3>
+                    <p className="text-xs text-foreground/50">
+                      By @{pr.author} · {pr.time}
+                    </p>
+                  </div>
+                ))}
               </div>
-            </div>
+            )}
           </div>
         );
       }
@@ -1922,7 +1877,7 @@ export function DashboardPage({
               </div>
               <button
                 type="button"
-                onClick={() => showToast("Starting discussion draft...")}
+                onClick={() => setNewDiscussionOpen(true)}
                 className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-md bg-accent-pro text-white text-xs font-medium"
               >
                 <Plus className="size-3.5" />
@@ -1930,28 +1885,96 @@ export function DashboardPage({
               </button>
             </div>
 
-            <div className="space-y-3">
-              {discussions.map((d) => (
-                <div
-                  key={d.id}
-                  className="p-5 rounded-xl border border-border/50 bg-foreground/5 space-y-2 hover:border-border transition-colors cursor-pointer"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full border border-border/50 bg-foreground/10 text-foreground/70">
-                      {d.category}
-                    </span>
-                    <span className="text-xs text-foreground/40 font-mono">
-                      by {d.author} · {d.lastActivity}
-                    </span>
+            {discussions.length === 0 ? (
+              <div className="p-10 rounded-xl border border-border/50 bg-foreground/5 text-center space-y-2">
+                <p className="text-sm font-medium text-foreground">No discussions yet</p>
+                <p className="text-xs text-foreground/50 font-mono">
+                  Start the first discussion thread in your workspace.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {discussions.map((d) => (
+                  <div
+                    key={d.id}
+                    className="p-5 rounded-xl border border-border/50 bg-foreground/5 space-y-2 hover:border-border transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full border border-border/50 bg-foreground/10 text-foreground/70">
+                        {d.category}
+                      </span>
+                      <span className="text-xs text-foreground/40 font-mono">
+                        by {d.author} · {d.lastActivity}
+                      </span>
+                    </div>
+                    <h3 className="text-sm font-semibold text-foreground">{d.title}</h3>
+                    {d.body && <p className="text-xs text-foreground/60 line-clamp-2">{d.body}</p>}
+                    <p className="text-xs text-foreground/40 font-mono flex items-center gap-1">
+                      <MessageSquare className="size-3" />
+                      <span>{d.replies ?? 0} replies</span>
+                    </p>
                   </div>
-                  <h3 className="text-sm font-semibold text-foreground hover:underline">{d.title}</h3>
-                  <p className="text-xs text-foreground/40 font-mono flex items-center gap-1">
-                    <MessageSquare className="size-3" />
-                    <span>{d.replies} replies</span>
-                  </p>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
+
+            {newDiscussionOpen && (
+              <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+                <form
+                  onSubmit={handleCreateDiscussion}
+                  className="max-w-md w-full p-6 rounded-2xl border border-border/50 bg-card space-y-4 shadow-2xl"
+                >
+                  <div className="flex items-center justify-between border-b border-border/40 pb-3">
+                    <h3 className="font-bold text-sm text-foreground">Start a New Discussion</h3>
+                    <button type="button" onClick={() => setNewDiscussionOpen(false)} className="text-foreground/40 hover:text-foreground">
+                      <X className="size-4" />
+                    </button>
+                  </div>
+                  <div>
+                    <label className="text-xs font-mono text-foreground/50 block mb-1">Title *</label>
+                    <input
+                      type="text"
+                      required
+                      value={discussionForm.title}
+                      onChange={(e) => setDiscussionForm((p) => ({ ...p, title: e.target.value }))}
+                      placeholder="Topic title"
+                      className="w-full px-3 py-2 rounded-md border border-border/50 bg-foreground/5 text-xs text-foreground font-mono outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-mono text-foreground/50 block mb-1">Category</label>
+                    <select
+                      value={discussionForm.category}
+                      onChange={(e) => setDiscussionForm((p) => ({ ...p, category: e.target.value }))}
+                      className="w-full px-3 py-2 rounded-md border border-border/50 bg-foreground/5 text-xs text-foreground font-mono outline-none"
+                    >
+                      <option value="General">General</option>
+                      <option value="Ideas">Ideas</option>
+                      <option value="Q&A">Q&A</option>
+                      <option value="Announcements">Announcements</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-mono text-foreground/50 block mb-1">Body</label>
+                    <textarea
+                      rows={4}
+                      value={discussionForm.body}
+                      onChange={(e) => setDiscussionForm((p) => ({ ...p, body: e.target.value }))}
+                      placeholder="Share details..."
+                      className="w-full px-3 py-2 rounded-md border border-border/50 bg-foreground/5 text-xs text-foreground font-mono outline-none"
+                    />
+                  </div>
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-border/40">
+                    <button type="button" onClick={() => setNewDiscussionOpen(false)} className="px-3 py-1.5 rounded-md border border-border/50 text-xs text-foreground/60">
+                      Cancel
+                    </button>
+                    <button type="submit" className="px-4 py-1.5 rounded-md bg-accent-pro text-white text-xs font-medium">
+                      Post Discussion
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
           </div>
         );
       }
@@ -1960,6 +1983,9 @@ export function DashboardPage({
       // 13. PROFILE VIEW
       // ---------------------------------------------------------
       case "/profile": {
+        const joinedLabel = profileData.createdAt
+          ? new Date(profileData.createdAt).toLocaleDateString("en-US", { month: "long", year: "numeric" })
+          : "Recently";
         return (
           <div className="space-y-8 max-w-4xl">
             {/* Header info */}
@@ -1969,37 +1995,47 @@ export function DashboardPage({
               </div>
               <div className="space-y-1.5 flex-1">
                 <div className="flex items-center justify-between flex-wrap gap-2">
-                  <h1 className="text-2xl font-bold text-foreground capitalize">{username} Mercer</h1>
+                  <h1 className="text-2xl font-bold text-foreground">
+                    {profileData.fullName || username}
+                  </h1>
                   <button
                     type="button"
-                    onClick={() => showToast("Edit profile dialog opened.")}
+                    onClick={() => setEditProfileOpen(true)}
                     className="px-3.5 py-1.5 rounded-md border border-border/50 bg-foreground/5 text-xs font-mono text-foreground hover:border-border"
                   >
                     Edit profile
                   </button>
                 </div>
-                <p className="text-xs font-mono text-accent-pro">@{username}</p>
+                <p className="text-xs font-mono text-accent-pro">@{profileData.username || username}</p>
                 <p className="text-xs text-foreground/70 leading-relaxed max-w-xl">
-                  Distributed systems hacker & Rust kernel engineer. Architecting byte-compatible Git for edge cloud runtimes.
+                  {profileData.bio || "No bio set yet. Click Edit profile to add a developer bio."}
                 </p>
                 <div className="flex items-center gap-4 text-xs font-mono text-foreground/50 pt-2 flex-wrap">
+                  {profileData.location && (
+                    <span className="flex items-center gap-1">
+                      <MapPin className="size-3" /> {profileData.location}
+                    </span>
+                  )}
+                  {profileData.website && (
+                    <span className="flex items-center gap-1">
+                      <LinkIcon className="size-3" /> {profileData.website}
+                    </span>
+                  )}
                   <span className="flex items-center gap-1">
-                    <MapPin className="size-3" /> San Francisco, CA
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <LinkIcon className="size-3" /> https://{username}.dev
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Calendar className="size-3" /> Joined January 2026
+                    <Calendar className="size-3" /> Joined {joinedLabel}
                   </span>
                 </div>
                 <div className="flex items-center gap-3 text-xs font-mono text-foreground/60 pt-1">
                   <span>
-                    <strong className="text-foreground">142</strong> followers
+                    <strong className="text-foreground">{repos.length}</strong> repositories
                   </span>
                   <span>·</span>
                   <span>
-                    <strong className="text-foreground">88</strong> following
+                    <strong className="text-foreground">{dashboardStats.totalStarsEarned}</strong> stars earned
+                  </span>
+                  <span>·</span>
+                  <span>
+                    <strong className="text-foreground">{dashboardStats.totalCommits}</strong> commits
                   </span>
                 </div>
               </div>
@@ -2007,27 +2043,37 @@ export function DashboardPage({
 
             {/* Pinned Repositories */}
             <div className="space-y-4">
-              <h3 className="text-base font-bold text-foreground">Pinned Repositories</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {repos.slice(0, 2).map((repo) => (
-                  <div key={repo.id} className="p-4 rounded-xl border border-border/50 bg-foreground/5 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-sm text-foreground">{repo.name}</span>
-                      <span className="text-[10px] font-mono px-1.5 rounded border border-border/50 text-foreground/50">
-                        Public
-                      </span>
+              <h3 className="text-base font-bold text-foreground">Repositories</h3>
+              {repos.length === 0 ? (
+                <div className="p-6 rounded-xl border border-border/50 bg-foreground/5 text-xs text-foreground/50 font-mono">
+                  No repositories created yet.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {repos.slice(0, 4).map((repo) => (
+                    <div
+                      key={repo.id}
+                      onClick={() => setSelectedRepoForTree(repo)}
+                      className="p-4 rounded-xl border border-border/50 bg-foreground/5 space-y-2 cursor-pointer hover:border-border transition-colors"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-sm text-foreground">{repo.name}</span>
+                        <span className="text-[10px] font-mono px-1.5 rounded border border-border/50 text-foreground/50">
+                          {repo.isPrivate ? "Private" : "Public"}
+                        </span>
+                      </div>
+                      <p className="text-xs text-foreground/50 line-clamp-2">{repo.description}</p>
+                      <div className="flex items-center gap-3 text-xs text-foreground/40 font-mono pt-2">
+                        <span className="flex items-center gap-1">
+                          <span className={`size-2 rounded-full ${repo.langColor}`} />
+                          {repo.lang}
+                        </span>
+                        <span>★ {repo.stars}</span>
+                      </div>
                     </div>
-                    <p className="text-xs text-foreground/50 line-clamp-2">{repo.description}</p>
-                    <div className="flex items-center gap-3 text-xs text-foreground/40 font-mono pt-2">
-                      <span className="flex items-center gap-1">
-                        <span className={`size-2 rounded-full ${repo.langColor}`} />
-                        {repo.lang}
-                      </span>
-                      <span>★ {repo.stars}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Contribution heatmap in Profile */}
@@ -2035,6 +2081,72 @@ export function DashboardPage({
               username={username}
               onCreateRepo={() => setActive("/new")}
             />
+
+            {editProfileOpen && (
+              <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+                <form
+                  onSubmit={handleSaveProfile}
+                  className="max-w-md w-full p-6 rounded-2xl border border-border/50 bg-card space-y-4 shadow-2xl"
+                >
+                  <div className="flex items-center justify-between border-b border-border/40 pb-3">
+                    <h3 className="font-bold text-sm text-foreground">Edit Profile</h3>
+                    <button type="button" onClick={() => setEditProfileOpen(false)} className="text-foreground/40 hover:text-foreground">
+                      <X className="size-4" />
+                    </button>
+                  </div>
+                  <div>
+                    <label className="text-xs font-mono text-foreground/50 block mb-1">Display Name</label>
+                    <input
+                      type="text"
+                      value={profileForm.fullName}
+                      onChange={(e) => setProfileForm((p) => ({ ...p, fullName: e.target.value }))}
+                      placeholder={username}
+                      className="w-full px-3 py-2 rounded-md border border-border/50 bg-foreground/5 text-xs text-foreground font-mono outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-mono text-foreground/50 block mb-1">Bio</label>
+                    <textarea
+                      rows={3}
+                      value={profileForm.bio}
+                      onChange={(e) => setProfileForm((p) => ({ ...p, bio: e.target.value }))}
+                      placeholder="Tell others about what you're building"
+                      className="w-full px-3 py-2 rounded-md border border-border/50 bg-foreground/5 text-xs text-foreground font-mono outline-none"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-mono text-foreground/50 block mb-1">Location</label>
+                      <input
+                        type="text"
+                        value={profileForm.location}
+                        onChange={(e) => setProfileForm((p) => ({ ...p, location: e.target.value }))}
+                        placeholder="City, Country"
+                        className="w-full px-3 py-2 rounded-md border border-border/50 bg-foreground/5 text-xs text-foreground font-mono outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-mono text-foreground/50 block mb-1">Website</label>
+                      <input
+                        type="text"
+                        value={profileForm.website}
+                        onChange={(e) => setProfileForm((p) => ({ ...p, website: e.target.value }))}
+                        placeholder="https://..."
+                        className="w-full px-3 py-2 rounded-md border border-border/50 bg-foreground/5 text-xs text-foreground font-mono outline-none"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-border/40">
+                    <button type="button" onClick={() => setEditProfileOpen(false)} className="px-3 py-1.5 rounded-md border border-border/50 text-xs text-foreground/60">
+                      Cancel
+                    </button>
+                    <button type="submit" className="px-4 py-1.5 rounded-md bg-accent-pro text-white text-xs font-medium">
+                      Save Profile
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
           </div>
         );
       }
@@ -2113,9 +2225,14 @@ export function DashboardPage({
 
                   <button
                     type="button"
-                    onClick={() => {
-                      setTokens((prev) => prev.filter((t) => t.id !== token.id));
-                      showToast(`Token ${token.name} revoked.`);
+                    onClick={async () => {
+                      try {
+                        await dashboardApi.deleteToken(token.id);
+                        setTokens((prev) => prev.filter((t) => t.id !== token.id));
+                        showToast(`Token ${token.name} revoked.`);
+                      } catch {
+                        showToast("Failed to revoke token.");
+                      }
                     }}
                     className="text-xs font-mono text-accent-pro hover:underline self-start sm:self-auto"
                   >
@@ -2268,9 +2385,14 @@ export function DashboardPage({
 
                   <button
                     type="button"
-                    onClick={() => {
-                      setSshKeys((prev) => prev.filter((item) => item.id !== k.id));
-                      showToast(`Key ${k.title} deleted.`);
+                    onClick={async () => {
+                      try {
+                        await dashboardApi.deleteSshKey(k.id);
+                        setSshKeys((prev) => prev.filter((item) => item.id !== k.id));
+                        showToast(`Key ${k.title} deleted.`);
+                      } catch {
+                        showToast("Failed to delete SSH key.");
+                      }
                     }}
                     className="text-xs font-mono text-accent-pro hover:underline self-start sm:self-auto flex items-center gap-1"
                   >
@@ -2472,15 +2594,22 @@ export function DashboardPage({
 
               <div className="flex flex-col gap-1 text-sm text-foreground/60 leading-relaxed">
                 <p>
-                  You have <span className="text-foreground font-medium">4 repositories</span>,{" "}
-                  <span className="text-foreground font-medium">2 open pull requests</span>, and{" "}
-                  <span className="text-accent-pro font-medium">3 unread notifications</span>.
+                  You have <span className="text-foreground font-medium">{repos.length} {repos.length === 1 ? "repository" : "repositories"}</span>,{" "}
+                  <span className="text-foreground font-medium">{dashboardStats.openPullRequestsCount} open pull {dashboardStats.openPullRequestsCount === 1 ? "request" : "requests"}</span>, and{" "}
+                  <span className="text-accent-pro font-medium">{unreadNotifsCount} unread {unreadNotifsCount === 1 ? "notification" : "notifications"}</span>.
                 </p>
                 <p className="text-foreground/45">
-                  All edge remote operations are healthy and synced across 3 global points of presence.
+                  All data is synced live from your Neon PostgreSQL workspace.
                 </p>
                 <p className="text-xs text-foreground/40 font-mono">
-                  Last push was 24 minutes ago to <code className="text-foreground/70">mygit-kernel:main</code>.
+                  {dashboardStats.lastPush ? (
+                    <>
+                      Last push was {formatRelativeTime(dashboardStats.lastPush.authoredAt)} to{" "}
+                      <code className="text-foreground/70">{dashboardStats.lastPush.repoName}:{dashboardStats.lastPush.branch}</code>.
+                    </>
+                  ) : (
+                    <>No commits pushed yet — push your first commit with <code className="text-foreground/70">mygit push origin main</code>.</>
+                  )}
                 </p>
               </div>
             </div>
@@ -2509,22 +2638,24 @@ export function DashboardPage({
               <div className="p-4 rounded-lg border border-border/50 bg-foreground/5 space-y-1">
                 <p className="text-xs text-foreground/40 font-mono">Repositories</p>
                 <p className="text-2xl font-bold text-foreground">{repos.length}</p>
-                <p className="text-[11px] text-emerald-400 font-mono">2 public · 2 private</p>
+                <p className="text-[11px] text-emerald-400 font-mono">
+                  {dashboardStats.publicReposCount} public · {dashboardStats.privateReposCount} private
+                </p>
               </div>
               <div className="p-4 rounded-lg border border-border/50 bg-foreground/5 space-y-1">
                 <p className="text-xs text-foreground/40 font-mono">Total Commits</p>
-                <p className="text-2xl font-bold text-foreground">348</p>
-                <p className="text-[11px] text-emerald-400 font-mono">+24 this week</p>
+                <p className="text-2xl font-bold text-foreground">{dashboardStats.totalCommits}</p>
+                <p className="text-[11px] text-emerald-400 font-mono">+{dashboardStats.commitsThisWeek} this week</p>
               </div>
               <div className="p-4 rounded-lg border border-border/50 bg-foreground/5 space-y-1">
                 <p className="text-xs text-foreground/40 font-mono">Stars Earned</p>
-                <p className="text-2xl font-bold text-foreground">39</p>
-                <p className="text-[11px] text-emerald-400 font-mono">+5 new stargazers</p>
+                <p className="text-2xl font-bold text-foreground">{dashboardStats.totalStarsEarned}</p>
+                <p className="text-[11px] text-emerald-400 font-mono">across {repos.length} repositories</p>
               </div>
               <div className="p-4 rounded-lg border border-border/50 bg-foreground/5 space-y-1">
                 <p className="text-xs text-foreground/40 font-mono">Open Pull Requests</p>
-                <p className="text-2xl font-bold text-accent-pro">2</p>
-                <p className="text-[11px] text-accent-pro font-mono">Awaiting your review</p>
+                <p className="text-2xl font-bold text-accent-pro">{dashboardStats.openPullRequestsCount}</p>
+                <p className="text-[11px] text-accent-pro font-mono">{dashboardStats.openIssuesCount} open issues</p>
               </div>
             </div>
 
@@ -2611,33 +2742,35 @@ export function DashboardPage({
                 </div>
 
                 <div className="p-4 rounded-lg border border-border/50 bg-foreground/5 space-y-4">
-                  <div className="flex gap-2.5 text-xs">
-                    <div className="size-1.5 rounded-full bg-accent-pro mt-1.5 shrink-0" />
-                    <div className="space-y-0.5">
-                      <p className="text-foreground/70 leading-snug">
-                        Pushed 3 commits to <span className="font-medium text-foreground">mygit-kernel:main</span>
-                      </p>
-                      <p className="text-[10px] font-mono text-foreground/40">24 minutes ago · 8feca42</p>
-                    </div>
-                  </div>
-                  <div className="flex gap-2.5 text-xs">
-                    <div className="size-1.5 rounded-full bg-accent-pro mt-1.5 shrink-0" />
-                    <div className="space-y-0.5">
-                      <p className="text-foreground/70 leading-snug">
-                        Opened PR #14: <span className="font-medium text-foreground">packfile delta compression v2</span>
-                      </p>
-                      <p className="text-[10px] font-mono text-foreground/40">2 hours ago · Needs review</p>
-                    </div>
-                  </div>
-                  <div className="flex gap-2.5 text-xs">
-                    <div className="size-1.5 rounded-full bg-accent-pro mt-1.5 shrink-0" />
-                    <div className="space-y-0.5">
-                      <p className="text-foreground/70 leading-snug">
-                        Merged PR #12 into <span className="font-medium text-foreground">mygit-kernel:main</span>
-                      </p>
-                      <p className="text-[10px] font-mono text-foreground/40">5 hours ago · a4204e5</p>
-                    </div>
-                  </div>
+                  {activity.length === 0 ? (
+                    <p className="text-xs text-foreground/45 font-mono">
+                      No recent activity yet. Push a commit or open a PR to see live events.
+                    </p>
+                  ) : (
+                    activity.slice(0, 4).map((item) => (
+                      <div key={item.id} className="flex gap-2.5 text-xs">
+                        <div className="size-1.5 rounded-full bg-accent-pro mt-1.5 shrink-0" />
+                        <div className="space-y-0.5">
+                          <p className="text-foreground/70 leading-snug">
+                            {item.type === "push" && (
+                              <>Pushed to <span className="font-medium text-foreground">{item.repo}:{item.branch || "main"}</span></>
+                            )}
+                            {item.type === "pr" && (
+                              <>PR #{item.number} ({item.status}): <span className="font-medium text-foreground">{item.title}</span></>
+                            )}
+                            {item.type === "issue" && (
+                              <>Issue #{item.number} ({item.status}): <span className="font-medium text-foreground">{item.title}</span></>
+                            )}
+                            {item.type === "star" && <>{item.title}</>}
+                          </p>
+                          <p className="text-[10px] font-mono text-foreground/40">
+                            {formatRelativeTime(item.timestamp)}
+                            {item.sha ? ` · ${String(item.sha).slice(0, 7)}` : ` · ${item.repo}`}
+                          </p>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             </div>

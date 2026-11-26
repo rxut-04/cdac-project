@@ -159,3 +159,58 @@ export const repoApi = {
     return res.data;
   },
 };
+
+export const dashboardApi = {
+  getSummary: async (): Promise<any> => {
+    const res = await api.get("/dashboard/summary");
+    return res.data;
+  },
+
+  updateProfile: async (data: {
+    fullName?: string;
+    bio?: string;
+    location?: string;
+    website?: string;
+  }): Promise<any> => {
+    const res = await api.patch("/user/profile", data);
+    return res.data;
+  },
+
+  listTokens: async (): Promise<any[]> => {
+    const res = await api.get("/user/tokens");
+    return res.data;
+  },
+
+  createToken: async (data: { name: string; expires?: string; scopes?: string }): Promise<any> => {
+    const res = await api.post("/user/tokens", data);
+    return res.data;
+  },
+
+  deleteToken: async (id: number | string): Promise<void> => {
+    await api.delete(`/user/tokens/${id}`);
+  },
+
+  listSshKeys: async (): Promise<any[]> => {
+    const res = await api.get("/user/ssh-keys");
+    return res.data;
+  },
+
+  addSshKey: async (data: { title: string; publicKey: string }): Promise<any> => {
+    const res = await api.post("/user/ssh-keys", data);
+    return res.data;
+  },
+
+  deleteSshKey: async (id: number | string): Promise<void> => {
+    await api.delete(`/user/ssh-keys/${id}`);
+  },
+
+  listDiscussions: async (): Promise<any[]> => {
+    const res = await api.get("/discussions");
+    return res.data;
+  },
+
+  createDiscussion: async (data: { title: string; body?: string; category?: string }): Promise<any> => {
+    const res = await api.post("/discussions", data);
+    return res.data;
+  },
+};
