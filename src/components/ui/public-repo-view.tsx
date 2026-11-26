@@ -88,7 +88,7 @@ export function PublicRepoView({ owner, repoName, onBackHome, onLogin }: PublicR
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6">
         <RepoFileExplorer
           repoName={repo.name}
           ownerUsername={repo.ownerUsername || owner}

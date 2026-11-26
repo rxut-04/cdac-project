@@ -1064,7 +1064,7 @@ export function RepoFileExplorer({
   }, [branches, branchSearch]);
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto pb-12 animate-in fade-in duration-200">
+    <div className={`space-y-6 mx-auto pb-12 animate-in fade-in duration-200 ${chatOpen ? "max-w-[1600px]" : "max-w-7xl"}`}>
       {/* Top Header Bar */}
       <div className="flex flex-col gap-4 border-b border-border/40 pb-5">
         <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -1444,7 +1444,7 @@ export function RepoFileExplorer({
       {/* TAB 1: CODE EXPLORER */}
       {activeTab === "code" && (
         <div className="space-y-6">
-          <div className={`grid grid-cols-1 gap-4 min-h-[520px] ${chatOpen ? "lg:grid-cols-[16rem_1fr_22rem]" : "lg:grid-cols-[18rem_1fr]"}`}>
+          <div className={`grid grid-cols-1 gap-4 min-h-[520px] ${chatOpen ? "lg:grid-cols-[15rem_minmax(0,1fr)_24rem] xl:grid-cols-[16rem_minmax(0,1fr)_26rem]" : "lg:grid-cols-[18rem_1fr]"}`}>
             {/* Left Side: Dynamic FileTree */}
             <div className="rounded-xl border border-border/50 bg-foreground/5 flex flex-col overflow-hidden shadow-sm">
               <div className="p-3 border-b border-border/40 flex items-center justify-between gap-2">
