@@ -25,24 +25,38 @@ export const ContributionHeatmap: React.FC<ContributionHeatmapProps> = ({
 
   useEffect(() => {
     let isMounted = true;
-    setLoading(true);
+    const fetchContributions = (showLoader = false) => {
+      if (showLoader) setLoading(true);
+      // Prefer authenticated /user/contributions when token exists, fallback to /users/:username/contributions
+      const hasToken = typeof window !== "undefined" && Boolean(localStorage.getItem("mygit_token"));
+      const url = hasToken
+        ? "/user/contributions"
+        : username
+          ? `/users/${encodeURIComponent(username)}/contributions`
+          : "/user/contributions";
 
-    const url = username ? `/users/${encodeURIComponent(username)}/contributions` : "/user/contributions";
+      api.get<ContributionData>(url)
+        .then((res) => {
+          if (isMounted && res.data) {
+            setData(res.data);
+          }
+        })
+        .catch((err) => {
+          console.debug("Contribution fetch error:", err);
+        })
+        .finally(() => {
+          if (isMounted) setLoading(false);
+        });
+    };
 
-    api.get<ContributionData>(url)
-      .then((res) => {
-        if (isMounted && res.data) {
-          setData(res.data);
-        }
-      })
-      .catch((err) => {
-        console.debug("Contribution fetch error:", err);
-      })
-      .finally(() => {
-        if (isMounted) setLoading(false);
-      });
+    fetchContributions(true);
+    const onFocus = () => fetchContributions(false);
+    window.addEventListener("focus", onFocus);
 
-    return () => { isMounted = false; };
+    return () => {
+      isMounted = false;
+      window.removeEventListener("focus", onFocus);
+    };
   }, [username]);
 
   // Generate 52 weeks (364 days) up to today
@@ -95,6 +109,10 @@ export const ContributionHeatmap: React.FC<ContributionHeatmapProps> = ({
 
     if (currentWeek.length > 0) {
       resultWeeks.push(currentWeek);
+    }
+
+    if (months.length >= 2 && months[1].weekIndex - months[0].weekIndex <= 2) {
+      months.shift();
     }
 
     return { weeks: resultWeeks, monthLabels: months };

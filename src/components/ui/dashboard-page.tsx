@@ -2031,21 +2031,10 @@ export function DashboardPage({
             </div>
 
             {/* Contribution heatmap in Profile */}
-            <div className="p-6 rounded-xl border border-border/50 bg-foreground/5 space-y-3">
-              <h3 className="text-sm font-semibold text-foreground">348 contributions in 2026</h3>
-              <div className="overflow-x-auto pb-1 no-scrollbar">
-                <div className="grid grid-flow-col grid-rows-7 gap-1">
-                  {heatmapData.flatMap((week, wi) =>
-                    week.map((level, di) => (
-                      <div
-                        key={`${wi}-${di}`}
-                        className={`size-3 rounded-sm border ${heatMapColors[level]}`}
-                      />
-                    ))
-                  )}
-                </div>
-              </div>
-            </div>
+            <ContributionHeatmap
+              username={username}
+              onCreateRepo={() => setActive("/new")}
+            />
           </div>
         );
       }
