@@ -399,6 +399,8 @@ export function RepoFileExplorer({
     currentUsername && ownerUsername && currentUsername.toLowerCase() === ownerUsername.toLowerCase()
   );
   const [shareCopied, setShareCopied] = useState(false);
+  const [liveUrlCopied, setLiveUrlCopied] = useState(false);
+  const backendOrigin = (api.defaults.baseURL || "https://mygit-backend-y27o.onrender.com/api").replace(/\/api\/?$/, "");
   const [chatOpen, setChatOpen] = useState(true);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
@@ -1241,8 +1243,25 @@ export function RepoFileExplorer({
             <span>Back to Repositories</span>
           </button>
 
-          {/* Top Actions: Star, Fork, and Code Dropdown */}
-          <div className="flex items-center gap-2">
+          {/* Top Actions: Live Site, Share, Star, Fork, and Code Dropdown */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {(() => {
+              const liveDep = deploymentsList.find((d) => d.status === "LIVE" && d.liveUrl);
+              if (!liveDep?.liveUrl) return null;
+              return (
+                <a
+                  href={`${backendOrigin}${liveDep.liveUrl}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/15 hover:bg-emerald-500/25 text-xs font-mono font-medium text-emerald-400 transition-all shadow-xs"
+                  title="Open live mygit Pages site"
+                >
+                  <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>Live Site</span>
+                  <ExternalLink className="size-3" />
+                </a>
+              );
+            })()}
             {/* Share Read-Only Link Button */}
             <button
               type="button"
@@ -2818,7 +2837,7 @@ export function RepoFileExplorer({
             <div className="flex items-center gap-2 shrink-0 flex-wrap">
               {activeDeployment?.status === "LIVE" && activeDeployment?.liveUrl && (
                 <a
-                  href={`${(api.defaults.baseURL || "https://mygit-backend-y27o.onrender.com/api").replace(/\/api\/?$/, "")}${activeDeployment.liveUrl}`}
+                  href={`${backendOrigin}${activeDeployment.liveUrl}`}
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-emerald-500/40 bg-emerald-500/15 text-emerald-400 text-xs font-mono font-semibold hover:bg-emerald-500/25 transition-colors"
@@ -2840,6 +2859,34 @@ export function RepoFileExplorer({
               )}
             </div>
           </div>
+
+          {activeDeployment?.status === "LIVE" && activeDeployment?.liveUrl && (
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-emerald-500/25 bg-emerald-500/5 px-3.5 py-2.5">
+              <div className="flex items-center gap-2 min-w-0">
+                <Globe className="size-4 text-emerald-400 shrink-0" />
+                <a
+                  href={`${backendOrigin}${activeDeployment.liveUrl}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs font-mono text-emerald-400 hover:underline truncate"
+                >
+                  {`${backendOrigin}${activeDeployment.liveUrl}`}
+                </a>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(`${backendOrigin}${activeDeployment.liveUrl}`);
+                  setLiveUrlCopied(true);
+                  setTimeout(() => setLiveUrlCopied(false), 2000);
+                }}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-[11px] font-mono text-emerald-300 shrink-0 transition-colors"
+              >
+                {liveUrlCopied ? <Check className="size-3" /> : <Copy className="size-3" />}
+                <span>{liveUrlCopied ? "Copied" : "Copy URL"}</span>
+              </button>
+            </div>
+          )}
 
           {/* Deployment History Pills */}
           {deploymentsList.length > 0 && (
