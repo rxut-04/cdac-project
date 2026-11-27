@@ -49,6 +49,8 @@ import {
   X,
   Share2,
   Sparkles,
+  Rocket,
+  ExternalLink,
 } from "lucide-react";
 
 export interface RepoFileExplorerProps {
@@ -509,8 +511,170 @@ export function RepoFileExplorer({
   const [editorMessage, setEditorMessage] = useState("");
   const [savingFile, setSavingFile] = useState(false);
 
-  // Navigation Tabs: "code" | "commits" | "pulls" | "issues" | "settings"
-  const [activeTab, setActiveTab] = useState<"code" | "commits" | "pulls" | "issues" | "settings">("code");
+  // Navigation Tabs: "code" | "commits" | "pulls" | "issues" | "deployments" | "settings"
+  const [activeTab, setActiveTab] = useState<"code" | "commits" | "pulls" | "issues" | "deployments" | "settings">("code");
+
+  // Deployments & AI Troubleshooter State
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [deploymentsList, setDeploymentsList] = useState<any[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [activeDeployment, setActiveDeployment] = useState<any | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [deploymentLogs, setDeploymentLogs] = useState<any[]>([]);
+  const [deploying, setDeploying] = useState(false);
+  const [troubleshootMessages, setTroubleshootMessages] = useState<ThreadMessage[]>([]);
+  const [troubleshootInput, setTroubleshootInput] = useState("");
+  const [troubleshootLoading, setTroubleshootLoading] = useState(false);
+
+  const runTroubleshooter = async (dep: any, logs: any[], customQuestion?: string) => {
+    if (!dep || troubleshootLoading) return;
+    const logSnippet = logs.map((l) => `[${l.level}] ${l.message}`).join("\n");
+    const q = customQuestion?.trim()
+      || `Deployment #${dep.id} failed (${dep.framework}). Error summary: ${dep.errorSummary || "Unknown"}.\n\nLogs:\n${logSnippet}\n\nExplain clearly what is occurring and the exact steps needed to fix it.`;
+
+    const turnId = String(Date.now());
+    const userMsg: ThreadMessage = {
+      id: `tu-${turnId}`,
+      role: "user",
+      text: customQuestion?.trim() || "Analyze this deployment error and tell me how to fix it.",
+    };
+    const assistantId = `ta-${turnId}`;
+    const initAssistant: ThreadMessage = {
+      id: assistantId,
+      role: "assistant",
+      reasoning: { text: "Analyzing deployment logs and repository structure..." },
+      steps: [{ id: `ts-${turnId}`, title: "Inspecting deployment logs", state: "running" }],
+      streaming: true,
+      text: "",
+    };
+
+    setTroubleshootMessages((prev) => (customQuestion ? [...prev, userMsg, initAssistant] : [userMsg, initAssistant]));
+    setTroubleshootLoading(true);
+    try {
+      const res = await repoApi.chat(ownerUsername, currentRepoName, {
+        message: q,
+        branch: dep.branch || currentBranch,
+        activeFilePath: selectedFile?.path,
+        activeFileContent: selectedFile?.code,
+      });
+      setTroubleshootMessages((prev) =>
+        prev.map((m) =>
+          m.id === assistantId && m.role === "assistant"
+            ? {
+                ...m,
+                reasoning: { text: res.reasoning, seconds: res.reasoningSeconds || 1 },
+                steps: res.steps,
+                text: res.reply,
+                streaming: false,
+              }
+            : m
+        )
+      );
+    } catch (err: any) {
+      setTroubleshootMessages((prev) =>
+        prev.map((m) =>
+          m.id === assistantId && m.role === "assistant"
+            ? {
+                ...m,
+                reasoning: { text: "Deployment diagnostic check completed.", seconds: 1 },
+                steps: [{ id: `te-${turnId}`, title: "Log diagnostics", state: "error", detail: err?.message || "Failed" }],
+                text: `**What occurred**: ${dep.errorSummary || "Deployment failed."}\n\n- Check that your repository contains a built \`index.html\` (root, \`dist/\`, \`build/\`, or \`out/\`) and push it to \`${dep.branch || "main"}\`.`,
+                streaming: false,
+              }
+            : m
+        )
+      );
+    } finally {
+      setTroubleshootLoading(false);
+    }
+  };
+
+  const loadDeploymentWithStream = async (dep: any) => {
+    setActiveDeployment(dep);
+    setDeploymentLogs([]);
+    setTroubleshootMessages([]);
+
+    const baseUrl = (api.defaults.baseURL || "https://mygit-backend-y27o.onrender.com/api").replace(/\/+$/, "");
+    let streamedLogs: any[] = [];
+    try {
+      const es = new EventSource(`${baseUrl}/deployments/${dep.id}/logs/stream`);
+      es.addEventListener("log", (ev: MessageEvent) => {
+        try {
+          const item = JSON.parse(ev.data);
+          streamedLogs = [...streamedLogs, item];
+          setDeploymentLogs((prev) => (prev.some((x) => x.id === item.id) ? prev : [...prev, item]));
+        } catch {
+          // ignore
+        }
+      });
+      es.addEventListener("status", (ev: MessageEvent) => {
+        try {
+          const updated = JSON.parse(ev.data);
+          setActiveDeployment(updated);
+          if (updated.status === "FAILED") {
+            runTroubleshooter(updated, streamedLogs);
+          }
+        } catch {
+          // ignore
+        }
+        es.close();
+      });
+      es.onerror = async () => {
+        es.close();
+        try {
+          const res = await repoApi.getDeploymentLogs(dep.id);
+          setActiveDeployment(res.deployment);
+          setDeploymentLogs(res.logs || []);
+          if (res.deployment?.status === "FAILED") {
+            runTroubleshooter(res.deployment, res.logs || []);
+          }
+        } catch {
+          // ignore
+        }
+      };
+    } catch {
+      const res = await repoApi.getDeploymentLogs(dep.id);
+      setActiveDeployment(res.deployment);
+      setDeploymentLogs(res.logs || []);
+      if (res.deployment?.status === "FAILED") {
+        runTroubleshooter(res.deployment, res.logs || []);
+      }
+    }
+  };
+
+  const handleDeployLive = async () => {
+    if (deploying) return;
+    setDeploying(true);
+    setActiveTab("deployments");
+    setTroubleshootMessages([]);
+    try {
+      const res = await repoApi.triggerDeployment(ownerUsername, currentRepoName, currentBranch);
+      setActiveDeployment(res.deployment);
+      setDeploymentLogs(res.logs || []);
+      setDeploymentsList((prev) => [res.deployment, ...prev.filter((d) => d.id !== res.deployment.id)]);
+      if (res.deployment?.status === "FAILED") {
+        runTroubleshooter(res.deployment, res.logs || []);
+      }
+    } catch (err: any) {
+      alert(`Deploy failed: ${err?.response?.data?.error || err?.message || "Unknown error"}`);
+    } finally {
+      setDeploying(false);
+    }
+  };
+
+  useEffect(() => {
+    repoApi
+      .listDeployments(ownerUsername, currentRepoName)
+      .then((list) => {
+        if (Array.isArray(list)) {
+          setDeploymentsList(list);
+          if (list.length > 0 && !activeDeployment) {
+            loadDeploymentWithStream(list[0]);
+          }
+        }
+      })
+      .catch(() => {});
+  }, [ownerUsername, currentRepoName]);
 
   // Star & Fork states
   const [starred, setStarred] = useState(false);
@@ -1417,7 +1581,29 @@ export function RepoFileExplorer({
               </span>
             </button>
 
-            {/* 5th Tab: Settings (Owner only) */}
+            {/* 5th Tab: Deployments (mygit Pages) */}
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab("deployments");
+                setSelectedCommitSha(null);
+                setSelectedPrNumber(null);
+                setSelectedIssueNumber(null);
+              }}
+              className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs font-medium transition-all ${
+                activeTab === "deployments"
+                  ? "bg-foreground/15 text-foreground shadow-xs font-semibold"
+                  : "text-foreground/60 hover:text-foreground"
+              }`}
+            >
+              <Rocket className="size-3.5 text-emerald-400" />
+              <span>Deployments</span>
+              <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-foreground/10 text-foreground/70">
+                {deploymentsList.length}
+              </span>
+            </button>
+
+            {/* 6th Tab: Settings (Owner only) */}
             {isOwner && (
               <button
                 type="button"
@@ -2601,7 +2787,221 @@ export function RepoFileExplorer({
         </div>
       )}
 
-      {/* TAB 5: REPOSITORY SETTINGS & DANGER ZONE */}
+      {/* TAB 5: DEPLOYMENTS (mygit Pages + Big Live Logs + AI Troubleshooter) */}
+      {activeTab === "deployments" && (
+        <div className="space-y-5">
+          {/* Top Action & Status Bar */}
+          <div className="p-5 rounded-xl border border-border/50 bg-foreground/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2.5">
+                <Rocket className="size-4 text-emerald-400" />
+                <h2 className="text-base font-bold text-foreground">mygit Pages Deployments</h2>
+                {activeDeployment && (
+                  <span
+                    className={`text-[10px] font-mono px-2 py-0.5 rounded-full border ${
+                      activeDeployment.status === "LIVE"
+                        ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
+                        : activeDeployment.status === "FAILED"
+                        ? "bg-red-500/15 text-red-400 border-red-500/30"
+                        : "bg-amber-500/15 text-amber-400 border-amber-500/30"
+                    }`}
+                  >
+                    {activeDeployment.status}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs font-mono text-foreground/55">
+                Automatically detects static HTML, prebuilt React/Vite (<code>dist/</code>, <code>build/</code>, <code>out/</code>), or missing entry points with live log streaming.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0 flex-wrap">
+              {activeDeployment?.status === "LIVE" && activeDeployment?.liveUrl && (
+                <a
+                  href={`${(api.defaults.baseURL || "https://mygit-backend-y27o.onrender.com/api").replace(/\/api\/?$/, "")}${activeDeployment.liveUrl}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-emerald-500/40 bg-emerald-500/15 text-emerald-400 text-xs font-mono font-semibold hover:bg-emerald-500/25 transition-colors"
+                >
+                  <ExternalLink className="size-3.5" />
+                  <span>Open Live Site</span>
+                </a>
+              )}
+              {isOwner && (
+                <button
+                  type="button"
+                  onClick={handleDeployLive}
+                  disabled={deploying}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-accent-pro text-white text-xs font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity"
+                >
+                  {deploying ? <Loader2 className="size-3.5 animate-spin" /> : <Rocket className="size-3.5" />}
+                  <span>{deploying ? "Deploying..." : "Deploy Live"}</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Deployment History Pills */}
+          {deploymentsList.length > 0 && (
+            <div className="flex items-center gap-2 overflow-x-auto pb-1">
+              {deploymentsList.slice(0, 8).map((d) => (
+                <button
+                  key={d.id}
+                  type="button"
+                  onClick={() => loadDeploymentWithStream(d)}
+                  className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-mono shrink-0 transition-colors ${
+                    activeDeployment?.id === d.id
+                      ? "border-accent-pro/60 bg-accent-pro/10 text-foreground"
+                      : "border-border/50 bg-foreground/5 text-foreground/60 hover:text-foreground"
+                  }`}
+                >
+                  <span
+                    className={`size-2 rounded-full ${
+                      d.status === "LIVE"
+                        ? "bg-emerald-400"
+                        : d.status === "FAILED"
+                        ? "bg-red-400"
+                        : "bg-amber-400"
+                    }`}
+                  />
+                  <span>#{d.id}</span>
+                  <span>· {d.framework}</span>
+                  <span>· {d.branch}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Big Live Logs Container + Automatic AI Troubleshooter on Error */}
+          <div
+            className={`grid grid-cols-1 gap-4 ${
+              activeDeployment?.status === "FAILED" ? "lg:grid-cols-[1.35fr_1fr]" : "grid-cols-1"
+            }`}
+          >
+            {/* Big Live Logs Container */}
+            <div className="rounded-xl border border-border/60 bg-[#07090e] text-neutral-200 overflow-hidden flex flex-col min-h-[460px] max-h-[640px] shadow-xl">
+              <div className="px-4 py-3 border-b border-neutral-800 bg-[#0e141d] flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-xs font-mono">
+                  <Terminal className="size-4 text-emerald-400" />
+                  <span className="font-semibold text-white">Live Deployment Logs</span>
+                  {activeDeployment && (
+                    <span className="text-neutral-400">
+                      · #{activeDeployment.id} ({activeDeployment.framework})
+                      {activeDeployment.durationMs ? ` · ${activeDeployment.durationMs}ms` : ""}
+                    </span>
+                  )}
+                </div>
+                {deploymentLogs.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(
+                        deploymentLogs.map((l) => `[${l.level}] ${l.message}`).join("\n")
+                      );
+                    }}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded border border-neutral-700 text-[11px] font-mono text-neutral-300 hover:text-white"
+                  >
+                    <Copy className="size-3" />
+                    <span>Copy logs</span>
+                  </button>
+                )}
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-4 font-mono text-xs space-y-2 leading-relaxed">
+                {deploymentLogs.length === 0 ? (
+                  <div className="h-full flex flex-col items-center justify-center text-center py-16 space-y-2 text-neutral-500">
+                    <Rocket className="size-8 opacity-40" />
+                    <p className="text-sm text-neutral-300 font-sans font-medium">No deployment logs yet</p>
+                    <p className="text-xs max-w-md">
+                      Click <span className="text-white font-semibold">Deploy Live</span> above to run project detection and stream live deployment logs.
+                    </p>
+                  </div>
+                ) : (
+                  deploymentLogs.map((log) => (
+                    <div key={log.id || log.seq} className="flex items-start gap-3">
+                      <span className="text-neutral-600 select-none w-6 text-right shrink-0">{log.seq}</span>
+                      <span
+                        className={`px-1.5 py-0.2 rounded text-[10px] font-semibold shrink-0 ${
+                          log.level === "ERROR"
+                            ? "bg-red-500/20 text-red-400 border border-red-500/30"
+                            : log.level === "WARN"
+                            ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                            : log.level === "SUCCESS"
+                            ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                            : "bg-neutral-800 text-neutral-400 border border-neutral-700"
+                        }`}
+                      >
+                        {log.level}
+                      </span>
+                      <span
+                        className={`break-words whitespace-pre-wrap ${
+                          log.level === "ERROR"
+                            ? "text-red-300"
+                            : log.level === "SUCCESS"
+                            ? "text-emerald-300 font-semibold"
+                            : log.level === "WARN"
+                            ? "text-amber-200"
+                            : "text-neutral-200"
+                        }`}
+                      >
+                        {log.message}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Automatic AI Deployment Troubleshooter on Error */}
+            {activeDeployment?.status === "FAILED" && (
+              <div className="rounded-xl border border-red-500/40 bg-foreground/5 flex flex-col min-h-[460px] max-h-[640px] overflow-hidden shadow-xl">
+                <div className="px-4 py-3 border-b border-red-500/30 bg-red-500/10 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-red-300">
+                    <Sparkles className="size-4 text-accent-pro shrink-0" />
+                    <span>AI Deployment Troubleshooter</span>
+                  </div>
+                  <span className="text-[10px] font-mono text-red-300/80">Auto-diagnosing failure</span>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                  <ReasoningThread
+                    messages={troubleshootMessages}
+                    label="Deployment Error Assistant"
+                  />
+                </div>
+
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!troubleshootInput.trim() || troubleshootLoading) return;
+                    const q = troubleshootInput.trim();
+                    setTroubleshootInput("");
+                    runTroubleshooter(activeDeployment, deploymentLogs, q);
+                  }}
+                  className="p-3 border-t border-border/40 bg-background/40 flex items-center gap-2"
+                >
+                  <input
+                    type="text"
+                    value={troubleshootInput}
+                    onChange={(e) => setTroubleshootInput(e.target.value)}
+                    placeholder="Ask how to fix this error..."
+                    className="flex-1 min-w-0 px-3 py-1.5 rounded-md border border-border/50 bg-foreground/5 text-xs text-foreground font-mono outline-none"
+                  />
+                  <button
+                    type="submit"
+                    disabled={troubleshootLoading || !troubleshootInput.trim()}
+                    className="p-2 rounded-md bg-accent-pro text-white disabled:opacity-40"
+                  >
+                    {troubleshootLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />}
+                  </button>
+                </form>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* TAB 6: REPOSITORY SETTINGS & DANGER ZONE */}
       {activeTab === "settings" && (
         <div className="space-y-8 animate-in fade-in duration-150">
           {/* Header */}

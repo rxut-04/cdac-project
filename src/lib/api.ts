@@ -195,6 +195,21 @@ export const repoApi = {
     const res = await api.post(`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/chat`, payload);
     return res.data;
   },
+
+  listDeployments: async (owner: string, name: string): Promise<any[]> => {
+    const res = await api.get(`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/deployments`);
+    return res.data;
+  },
+
+  triggerDeployment: async (owner: string, name: string, branch = "main"): Promise<{ deployment: any; logs: any[] }> => {
+    const res = await api.post(`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/deployments`, { branch });
+    return res.data;
+  },
+
+  getDeploymentLogs: async (id: number | string): Promise<{ deployment: any; logs: any[] }> => {
+    const res = await api.get(`/deployments/${id}/logs`);
+    return res.data;
+  },
 };
 
 export const dashboardApi = {
