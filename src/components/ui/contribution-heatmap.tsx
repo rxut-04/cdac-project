@@ -29,11 +29,13 @@ export const ContributionHeatmap: React.FC<ContributionHeatmapProps> = ({
       if (showLoader) setLoading(true);
       // Prefer authenticated /user/contributions when token exists, fallback to /users/:username/contributions
       const hasToken = typeof window !== "undefined" && Boolean(localStorage.getItem("token"));
-      const url = hasToken
+      const tz = typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "UTC";
+      const baseUrl = hasToken
         ? "/user/contributions"
         : username
           ? `/users/${encodeURIComponent(username)}/contributions`
           : "/user/contributions";
+      const url = `${baseUrl}?tz=${encodeURIComponent(tz || "UTC")}`;
 
       api.get<ContributionData>(url)
         .then((res) => {
@@ -51,11 +53,14 @@ export const ContributionHeatmap: React.FC<ContributionHeatmapProps> = ({
 
     fetchContributions(true);
     const onFocus = () => fetchContributions(false);
+    const onContribUpdated = () => fetchContributions(false);
     window.addEventListener("focus", onFocus);
+    window.addEventListener("mygit:contributions-updated", onContribUpdated);
 
     return () => {
       isMounted = false;
       window.removeEventListener("focus", onFocus);
+      window.removeEventListener("mygit:contributions-updated", onContribUpdated);
     };
   }, [username]);
 

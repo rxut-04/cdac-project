@@ -1122,6 +1122,7 @@ export function RepoFileExplorer({
         branch: currentBranch,
         message: editorMessage.trim() || `Update ${cleanPath}`,
       });
+      window.dispatchEvent(new Event("mygit:contributions-updated"));
       setFiles((prev) => {
         const idx = prev.findIndex((f) => f.path === cleanPath);
         const updated: RepoFile = {
