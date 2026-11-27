@@ -524,6 +524,7 @@ export function RepoFileExplorer({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [deploymentLogs, setDeploymentLogs] = useState<any[]>([]);
   const [deploying, setDeploying] = useState(false);
+  const [aiFixing, setAiFixing] = useState(false);
   const [troubleshootMessages, setTroubleshootMessages] = useState<ThreadMessage[]>([]);
   const [troubleshootInput, setTroubleshootInput] = useState("");
   const [troubleshootLoading, setTroubleshootLoading] = useState(false);
@@ -661,6 +662,85 @@ export function RepoFileExplorer({
       alert(`Deploy failed: ${err?.response?.data?.error || err?.message || "Unknown error"}`);
     } finally {
       setDeploying(false);
+    }
+  };
+
+  const handleAiFixAndRedeploy = async () => {
+    if (!activeDeployment?.id || aiFixing) return;
+    setAiFixing(true);
+    const turnId = `fix-${Date.now()}`;
+    setTroubleshootMessages((prev) => [
+      ...prev,
+      {
+        id: `u-${turnId}`,
+        role: "user",
+        text: "Auto-fix repository issues and redeploy to get a live URL.",
+      },
+      {
+        id: `a-${turnId}`,
+        role: "assistant",
+        reasoning: { text: "Analyzing failed logs and repository files to generate a repair commit...", seconds: 1 },
+        steps: [{ id: `s-${turnId}`, title: "AI Auto-Repair & Commit", state: "running" }],
+        text: "",
+        streaming: true,
+      },
+    ]);
+
+    try {
+      const { data } = await api.post(
+        `/repos/${encodeURIComponent(ownerUsername)}/${encodeURIComponent(currentRepoName)}/deployments/${activeDeployment.id}/ai-fix`
+      );
+      if (data?.fixed && data?.deployment) {
+        const changesList = Array.isArray(data.appliedChanges) && data.appliedChanges.length > 0
+          ? data.appliedChanges.map((p: string) => `- \`${p}\``).join("\n")
+          : "- Repository updated";
+        setTroubleshootMessages((prev) =>
+          prev.map((m) =>
+            m.id === `a-${turnId}`
+              ? {
+                  ...m,
+                  reasoning: { text: data.diagnosis || "Applied AI fix and committed to branch.", seconds: 2 },
+                  steps: [{ id: `s-${turnId}`, title: "AI Auto-Repair & Redeploy", state: "done", detail: data.commitSha?.slice(0, 7) || "committed" }],
+                  text: `**AI Fix Applied & Redeployed**\n\n${data.diagnosis}\n\n**Patched files:**\n${changesList}\n\n${data.deployment.status === "LIVE" ? `Live at \`${data.deployment.liveUrl}\`` : "Redeployment finished."}`,
+                  streaming: false,
+                }
+              : m
+          )
+        );
+        setActiveDeployment(data.deployment);
+        setDeploymentLogs(data.logs || []);
+        setDeploymentsList((prev) => [data.deployment, ...prev.filter((d) => d.id !== data.deployment.id)]);
+        window.dispatchEvent(new Event("mygit:contributions-updated"));
+      } else {
+        setTroubleshootMessages((prev) =>
+          prev.map((m) =>
+            m.id === `a-${turnId}`
+              ? {
+                  ...m,
+                  reasoning: { text: data?.diagnosis || "AI inspected repository.", seconds: 2 },
+                  steps: [{ id: `s-${turnId}`, title: "AI Auto-Repair Check", state: "error", detail: "Local build needed" }],
+                  text: `**Cannot auto-patch on server**\n\n${data?.diagnosis || "This project requires a local build."}\n\n${data?.unfixableReason || ""}`,
+                  streaming: false,
+                }
+              : m
+          )
+        );
+      }
+    } catch (err: any) {
+      setTroubleshootMessages((prev) =>
+        prev.map((m) =>
+          m.id === `a-${turnId}`
+            ? {
+                ...m,
+                steps: [{ id: `s-${turnId}`, title: "AI Auto-Repair", state: "error", detail: err?.response?.data?.error || "Request failed" }],
+                text: `Failed to apply AI fix: ${err?.response?.data?.error || err?.message || "Unknown error"}`,
+                streaming: false,
+              }
+            : m
+        )
+      );
+    } finally {
+      setAiFixing(false);
     }
   };
 
@@ -3003,12 +3083,24 @@ export function RepoFileExplorer({
             {/* Automatic AI Deployment Troubleshooter on Error */}
             {activeDeployment?.status === "FAILED" && (
               <div className="rounded-xl border border-red-500/40 bg-foreground/5 flex flex-col min-h-[460px] max-h-[640px] overflow-hidden shadow-xl">
-                <div className="px-4 py-3 border-b border-red-500/30 bg-red-500/10 flex items-center justify-between gap-2">
+                <div className="px-4 py-3 border-b border-red-500/30 bg-red-500/10 flex items-center justify-between gap-2 flex-wrap">
                   <div className="flex items-center gap-2 text-xs font-semibold text-red-300">
                     <Sparkles className="size-4 text-accent-pro shrink-0" />
                     <span>AI Deployment Troubleshooter</span>
                   </div>
-                  <span className="text-[10px] font-mono text-red-300/80">Auto-diagnosing failure</span>
+                  {isOwner ? (
+                    <button
+                      type="button"
+                      onClick={handleAiFixAndRedeploy}
+                      disabled={aiFixing || deploying}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-accent-pro text-white text-[11px] font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity"
+                    >
+                      {aiFixing ? <Loader2 className="size-3 animate-spin" /> : <Sparkles className="size-3" />}
+                      <span>{aiFixing ? "Fixing & Redeploying..." : "Auto-Fix & Redeploy with AI"}</span>
+                    </button>
+                  ) : (
+                    <span className="text-[10px] font-mono text-red-300/80">Auto-diagnosing failure</span>
+                  )}
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-4 space-y-4">
