@@ -183,23 +183,16 @@ export default function DemoOne({
             href="#"
             onClick={(e) => {
               e.preventDefault();
-              logoRef.current?.replay();
+              window.scrollTo({ top: 0, behavior: "smooth" });
             }}
-            className="flex items-center gap-2.5 group select-none cursor-pointer"
-            title="mygit · Click to replay liquid glass animation"
+            className="flex items-center group select-none cursor-pointer shrink-0"
+            title="mygit"
           >
-            <div className="relative w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center shadow-xs border border-neutral-200/80 dark:border-neutral-800 bg-neutral-100 dark:bg-neutral-900 shrink-0">
-              <LiquidGlassLogo
-                ref={logoRef}
-                logo="/logo.svg"
-                ending="logo"
-                theme={theme === "dark" ? "dark" : "light"}
-                depth={2.9}
-                className="!min-h-0 !w-full !h-full"
-                style={{ height: "100%", width: "100%", minHeight: 0, background: "transparent" }}
-              />
-            </div>
-            <span className="text-lg font-black tracking-tight text-neutral-950 dark:text-white">mygit</span>
+            <img
+              src="/logos/mygit.png"
+              alt="mygit"
+              className="h-9 sm:h-10 w-auto object-contain block"
+            />
           </a>
         </div>
 
