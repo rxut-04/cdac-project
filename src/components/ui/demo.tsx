@@ -191,7 +191,7 @@ export default function DemoOne({
             <img
               src="/logos/mygit.png"
               alt="mygit"
-              className="h-9 sm:h-10 w-auto object-contain block"
+              className="h-11 sm:h-12 w-auto object-contain block"
             />
           </a>
         </div>
