@@ -83,6 +83,11 @@ function AppContent() {
     };
   }, []);
 
+  // Pre-warm Render backend on app load so login/signup is instant instead of hitting cold-start delay
+  useEffect(() => {
+    fetch("https://mygit-backend-y27o.onrender.com/api/health").catch(() => {});
+  }, []);
+
   // Sync user email when Clerk signs in
   useEffect(() => {
     if (isLoaded && isSignedIn && user) {
