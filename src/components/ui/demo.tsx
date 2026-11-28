@@ -15,7 +15,7 @@ import {
   NavigationMenuList,
 } from "@/components/ui/navigation-menu";
 import { MobileNav } from "@/components/ui/navbar";
-import { LiquidGlassLogo, type LiquidGlassLogoHandle } from "@/components/liquid-glass-logo";
+import { Signature } from "@/components/signature";
 import { ElevenLabsOrb } from "@/components/ui/elevenlabs-orb";
 import { cn } from "@/lib/utils";
 
@@ -99,7 +99,6 @@ export default function DemoOne({
   onDashboard?: () => void;
 }) {
   const [authModal, setAuthModal] = useState<"login" | "signup" | null>(null);
-  const logoRef = React.useRef<LiquidGlassLogoHandle>(null);
   const [theme, setTheme] = useState<"light" | "dark">(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("mygit-theme");
@@ -186,13 +185,16 @@ export default function DemoOne({
               window.scrollTo({ top: 0, behavior: "smooth" });
             }}
             className="flex items-center group select-none cursor-pointer shrink-0"
-            title="mygit"
+            title="My Git"
           >
-            <img
-              src="/logos/mygit.png"
-              alt="mygit"
-              className="h-11 sm:h-12 w-auto object-contain block"
-            />
+            <div className="flex items-center justify-center">
+              <Signature
+                className="dark:invert-100"
+                text="My Git"
+                fontSize={16}
+                color="#1D1D1F"
+              />
+            </div>
           </a>
         </div>
 
