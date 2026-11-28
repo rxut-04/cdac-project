@@ -13,6 +13,7 @@ import { DiffViewer, FileDiff } from "@/components/ui/diff-viewer";
 import { ReasoningThread, type ThreadMessage } from "@/components/ui/reasoning-thread";
 import { RepoAnalyticsTab } from "@/components/ui/repo-analytics-tab";
 import { BarsSpinner } from "@/components/bars-spinner";
+import { Badge } from "@/components/badge";
 import {
   ArrowLeft,
   GitBranch,
@@ -1378,17 +1379,18 @@ export function RepoFileExplorer({
               const liveDep = deploymentsList.find((d) => d.status === "LIVE" && d.liveUrl);
               if (!liveDep?.liveUrl) return null;
               return (
-                <a
-                  href={`${backendOrigin}${liveDep.liveUrl}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/15 hover:bg-emerald-500/25 text-xs font-mono font-medium text-emerald-400 transition-all shadow-xs"
-                  title="Open live mygit Pages site"
-                >
-                  <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  <span>Live Site</span>
-                  <ExternalLink className="size-3" />
-                </a>
+                <Badge asChild variant="emerald" className="gap-1.5 px-3 py-1.5 font-mono hover:opacity-90 transition-opacity">
+                  <a
+                    href={`${backendOrigin}${liveDep.liveUrl}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    title="Open live mygit Pages site"
+                  >
+                    <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span>Live Site</span>
+                    <ExternalLink className="size-3" />
+                  </a>
+                </Badge>
               );
             })()}
             {/* Share Read-Only Link Button */}
@@ -1547,7 +1549,7 @@ export function RepoFileExplorer({
               <span className="text-foreground/50 text-sm font-mono">@{ownerUsername}</span>
               <span className="text-foreground/40 font-mono">/</span>
               <h2 className="text-xl font-bold tracking-tight text-foreground">{currentRepoName}</h2>
-              <span className="inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-full border border-border/50 text-foreground/60 bg-foreground/5">
+              <Badge variant={currentIsPrivate ? "amber" : "outline"} className="gap-1 font-mono text-[11px]">
                 {currentIsPrivate ? (
                   <>
                     <Lock className="size-2.5" /> Private
@@ -1557,7 +1559,7 @@ export function RepoFileExplorer({
                     <Globe className="size-2.5" /> Public
                   </>
                 )}
-              </span>
+              </Badge>
             </div>
             {forkedFrom && (
               <div className="flex items-center gap-1.5 text-xs font-mono text-foreground/60">
@@ -1571,23 +1573,23 @@ export function RepoFileExplorer({
             )}
           </div>
 
-          <div className="flex items-center gap-2 text-xs font-mono flex-wrap">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-foreground/5 border border-border/40 text-foreground/75">
-              <Layers className="size-3 text-emerald-400" />
+          <div className="flex items-center gap-2 font-mono flex-wrap">
+            <Badge variant="emerald" className="gap-1.5 px-2.5 py-1 font-mono">
+              <Layers className="size-3" />
               <span>{files.length} files</span>
-            </span>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-foreground/5 border border-border/40 text-foreground/75">
-              <GitCommit className="size-3 text-sky-400" />
+            </Badge>
+            <Badge variant="sky" className="gap-1.5 px-2.5 py-1 font-mono">
+              <GitCommit className="size-3" />
               <span>{commits.length} commits</span>
-            </span>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-foreground/5 border border-border/40 text-foreground/75">
-              <GitPullRequest className="size-3 text-purple-400" />
+            </Badge>
+            <Badge variant="purple" className="gap-1.5 px-2.5 py-1 font-mono">
+              <GitPullRequest className="size-3" />
               <span>{pullRequests.length} PRs</span>
-            </span>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-foreground/5 border border-border/40 text-foreground/75">
-              <AlertCircle className="size-3 text-amber-400" />
+            </Badge>
+            <Badge variant="amber" className="gap-1.5 px-2.5 py-1 font-mono">
+              <AlertCircle className="size-3" />
               <span>{issues.length} Issues</span>
-            </span>
+            </Badge>
           </div>
         </div>
 
