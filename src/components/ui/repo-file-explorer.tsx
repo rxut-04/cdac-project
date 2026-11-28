@@ -12,6 +12,7 @@ import { CodeBlock } from "@/components/ui/code-block";
 import { DiffViewer, FileDiff } from "@/components/ui/diff-viewer";
 import { ReasoningThread, type ThreadMessage } from "@/components/ui/reasoning-thread";
 import { RepoAnalyticsTab } from "@/components/ui/repo-analytics-tab";
+import { BarsSpinner } from "@/components/bars-spinner";
 import {
   ArrowLeft,
   GitBranch,
@@ -2076,8 +2077,9 @@ export function RepoFileExplorer({
                 </button>
 
                 {loadingCommitDiff ? (
-                  <div className="py-8 text-center text-xs font-mono text-foreground/50">
-                    Computing commit diff from Neon DB...
+                  <div className="py-8 flex items-center justify-center gap-2.5 text-xs font-mono text-foreground/50">
+                    <BarsSpinner size={16} />
+                    <span>Computing commit diff from Neon DB...</span>
                   </div>
                 ) : commitDiffData ? (
                   <div className="space-y-3">
@@ -2483,8 +2485,9 @@ export function RepoFileExplorer({
               </div>
 
               {loadingPulls ? (
-                <div className="p-8 text-center text-xs font-mono text-foreground/50">
-                  Loading pull requests from Neon DB...
+                <div className="p-8 flex items-center justify-center gap-2.5 text-xs font-mono text-foreground/50">
+                  <BarsSpinner size={16} />
+                  <span>Loading pull requests from Neon DB...</span>
                 </div>
               ) : pullRequests.length === 0 ? (
                 <div className="p-10 text-center space-y-2">
@@ -2851,8 +2854,9 @@ export function RepoFileExplorer({
               </div>
 
               {loadingIssues ? (
-                <div className="p-8 text-center text-xs font-mono text-foreground/50">
-                  Loading issues from Neon DB...
+                <div className="p-8 flex items-center justify-center gap-2.5 text-xs font-mono text-foreground/50">
+                  <BarsSpinner size={16} />
+                  <span>Loading issues from Neon DB...</span>
                 </div>
               ) : issues.length === 0 ? (
                 <div className="p-10 text-center space-y-2">
@@ -2984,7 +2988,7 @@ export function RepoFileExplorer({
                   }
                   className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-accent-pro text-white text-xs font-semibold hover:opacity-90 disabled:opacity-45 disabled:cursor-not-allowed transition-opacity"
                 >
-                  {deploying ? <Loader2 className="size-3.5 animate-spin" /> : <Rocket className="size-3.5" />}
+                  {deploying ? <BarsSpinner size={14} /> : <Rocket className="size-3.5" />}
                   <span>{deploying ? "Deploying..." : "Deploy Live"}</span>
                 </button>
               )}
@@ -3041,7 +3045,7 @@ export function RepoFileExplorer({
               disabled={analyzingProject}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border/50 bg-foreground/5 hover:bg-foreground/10 text-[11px] font-mono text-foreground/80 shrink-0 disabled:opacity-50"
             >
-              {analyzingProject ? <Loader2 className="size-3 animate-spin" /> : <Sparkles className="size-3" />}
+              {analyzingProject ? <BarsSpinner size={13} /> : <Sparkles className="size-3" />}
               <span>{analyzingProject ? "Scanning..." : "Re-scan"}</span>
             </button>
           </div>
@@ -3200,7 +3204,7 @@ export function RepoFileExplorer({
                       disabled={aiFixing || deploying}
                       className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-accent-pro text-white text-[11px] font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity"
                     >
-                      {aiFixing ? <Loader2 className="size-3 animate-spin" /> : <Sparkles className="size-3" />}
+                      {aiFixing ? <BarsSpinner size={13} /> : <Sparkles className="size-3" />}
                       <span>{aiFixing ? "Fixing & Redeploying..." : "Auto-Fix & Redeploy with AI"}</span>
                     </button>
                   ) : (

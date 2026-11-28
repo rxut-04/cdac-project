@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Sparkles, Flame, Trophy } from "lucide-react";
+import { BarsSpinner } from "@/components/bars-spinner";
 import { api } from "@/lib/api";
 
 interface ContributionData {
@@ -143,9 +144,12 @@ export const ContributionHeatmap: React.FC<ContributionHeatmapProps> = ({
             <Sparkles className="size-4 text-emerald-400" />
             <span>Continuous Contribution Ledger</span>
           </h2>
-          <p className="text-xs text-foreground/50 mt-0.5 font-mono">
+          <p className="text-xs text-foreground/50 mt-0.5 font-mono flex items-center gap-2">
             {loading ? (
-              "Synchronizing verified commits from Neon DB..."
+              <>
+                <BarsSpinner size={13} />
+                <span>Synchronizing verified commits from Neon DB...</span>
+              </>
             ) : (
               `${total} verified byte-compatible commit${total === 1 ? "" : "s"} in the last year`
             )}

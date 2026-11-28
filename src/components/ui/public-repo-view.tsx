@@ -4,7 +4,8 @@ import * as React from "react";
 import { useEffect, useState } from "react";
 import { authApi, repoApi, RepositoryItem } from "@/lib/api";
 import { RepoFileExplorer } from "@/components/ui/repo-file-explorer";
-import { Lock, Loader2, ArrowLeft, LogIn } from "lucide-react";
+import { Lock, ArrowLeft, LogIn } from "lucide-react";
+import { BarsSpinner } from "@/components/bars-spinner";
 
 interface PublicRepoViewProps {
   owner: string;
@@ -45,7 +46,7 @@ export function PublicRepoView({ owner, repoName, onBackHome, onLogin }: PublicR
     return (
       <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-6">
         <div className="flex items-center gap-3 text-sm font-mono text-foreground/60">
-          <Loader2 className="size-5 animate-spin text-accent-pro" />
+          <BarsSpinner size={20} />
           <span>Loading {owner}/{repoName}...</span>
         </div>
       </div>

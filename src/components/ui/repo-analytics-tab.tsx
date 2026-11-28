@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { Chart } from "@/components/chart";
+import { BarsSpinner } from "@/components/bars-spinner";
 import { api } from "@/lib/api";
 import {
   Activity,
@@ -159,8 +160,8 @@ export const RepoAnalyticsTab: React.FC<RepoAnalyticsTabProps> = ({
 
   if (loading && !data) {
     return (
-      <div className="rounded-xl border border-border/50 bg-foreground/5 p-12 flex items-center justify-center gap-2 text-xs font-mono text-foreground/60">
-        <Loader2 className="size-4 animate-spin text-accent-pro" />
+      <div className="rounded-xl border border-border/50 bg-foreground/5 p-12 flex items-center justify-center gap-3 text-xs font-mono text-foreground/60">
+        <BarsSpinner size={18} />
         <span>Loading real-time repository analytics...</span>
       </div>
     );

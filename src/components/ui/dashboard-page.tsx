@@ -5,6 +5,7 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import { repoApi, authApi, dashboardApi } from "@/lib/api";
 import { RepoFileExplorer } from "@/components/ui/repo-file-explorer";
 import { ContributionHeatmap } from "@/components/ui/contribution-heatmap";
+import { BarsSpinner } from "@/components/bars-spinner";
 import {
   Sidebar001,
   Sidebar001Content,
@@ -3196,7 +3197,8 @@ export function DashboardPage({
               </h1>
 
               {syncStatus === "loading" && (
-                <div className="p-3 rounded-lg border border-border/50 bg-foreground/5 text-xs font-mono text-foreground/60 flex items-center justify-between gap-3">
+                <div className="p-3 rounded-lg border border-border/50 bg-foreground/5 text-xs font-mono text-foreground/60 flex items-center gap-3">
+                  <BarsSpinner size={16} />
                   <span>Syncing live workspace data from Neon PostgreSQL (Render backend may take ~30s on cold start)...</span>
                 </div>
               )}

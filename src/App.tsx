@@ -6,6 +6,7 @@ import { DashboardPage } from "@/components/ui/dashboard-page";
 import { PublicRepoView } from "@/components/ui/public-repo-view";
 import { CommandPalette } from "@/components/ui/command-palette";
 import { VoiceAgentProvider } from "@/context/VoiceAgentContext";
+import { BarsSpinner } from "@/components/bars-spinner";
 import { authApi } from "@/lib/api";
 
 type Page = "home" | "login" | "signup" | "dashboard" | "repo";
@@ -114,7 +115,7 @@ function AppContent() {
     return (
       <div className="min-h-screen w-full flex items-center justify-center bg-[#0c0d0c] text-white">
         <div className="flex flex-col items-center gap-4 text-center p-6">
-          <div className="size-8 rounded-full border-2 border-[#9dff3a] border-t-transparent animate-spin" />
+          <BarsSpinner size={28} color="#9dff3a" />
           <p className="text-sm font-medium tracking-wide text-neutral-400">
             Completing authentication with Clerk...
           </p>
