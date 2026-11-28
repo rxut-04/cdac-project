@@ -628,6 +628,7 @@ export function RepoFileExplorer({
         try {
           const updated = JSON.parse(ev.data);
           setActiveDeployment(updated);
+          setDeploymentsList((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
           if (updated.status === "FAILED") {
             runTroubleshooter(updated, streamedLogs);
           }
@@ -3117,10 +3118,18 @@ export function RepoFileExplorer({
                   <Terminal className="size-3.5 text-neutral-400" />
                   <span className="font-medium text-neutral-200">Deploy log</span>
                   {activeDeployment && (
-                    <span className="text-neutral-500">
-                      #{activeDeployment.id} · {activeDeployment.framework}
-                      {activeDeployment.durationMs ? ` · ${activeDeployment.durationMs}ms` : ""}
-                      {deploymentLogs.length > 0 ? ` · ${deploymentLogs.length} lines` : ""}
+                    <span className="text-neutral-500 inline-flex items-center gap-2">
+                      <span>
+                        #{activeDeployment.id} · {activeDeployment.framework}
+                        {activeDeployment.durationMs ? ` · ${activeDeployment.durationMs}ms` : ""}
+                        {deploymentLogs.length > 0 ? ` · ${deploymentLogs.length} lines` : ""}
+                      </span>
+                      {activeDeployment.status === "BUILDING" && (
+                        <span className="inline-flex items-center gap-1.5 text-amber-300">
+                          <BarsSpinner size={11} />
+                          <span>Streaming live...</span>
+                        </span>
+                      )}
                     </span>
                   )}
                 </div>
