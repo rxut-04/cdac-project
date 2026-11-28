@@ -664,6 +664,7 @@ export function RepoFileExplorer({
     if (deploying) return;
     setDeploying(true);
     setActiveTab("deployments");
+    setDeploymentLogs([]);
     setTroubleshootMessages([]);
     try {
       const res = await repoApi.triggerDeployment(ownerUsername, currentRepoName, currentBranch);
@@ -3035,12 +3036,22 @@ export function RepoFileExplorer({
                     title={
                       projectAnalysis && !projectAnalysis.deployable
                         ? projectAnalysis.reason || "Project is not deployable yet"
+                        : deploymentsList.length > 0
+                        ? "Re-deploy production site and stream live logs"
                         : "Trigger production deploy"
                     }
                     className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-md bg-foreground text-background text-xs font-medium hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
                   >
                     {deploying ? <BarsSpinner size={13} /> : <Rocket className="size-3.5" />}
-                    <span>{deploying ? "Deploying..." : "Deploy"}</span>
+                    <span>
+                      {deploying
+                        ? deploymentsList.length > 0
+                          ? "Re-deploying..."
+                          : "Deploying..."
+                        : deploymentsList.length > 0
+                        ? "Re-deploy"
+                        : "Deploy"}
+                    </span>
                   </button>
                 )}
               </div>
@@ -3154,11 +3165,20 @@ export function RepoFileExplorer({
                 className="flex-1 overflow-y-auto px-4 py-3 font-mono text-[11.5px] leading-[1.6] space-y-0.5"
               >
                 {deploymentLogs.length === 0 ? (
-                  <div className="h-full flex flex-col items-center justify-center text-center py-20 space-y-2 text-neutral-500">
-                    <p className="text-xs text-neutral-400">No deployment logs yet</p>
-                    <p className="text-[11px] max-w-sm">
-                      Click <span className="text-neutral-200">Deploy</span> above to run a production deploy and stream logs.
-                    </p>
+                  <div className="h-full flex flex-col items-center justify-center text-center py-20 space-y-3 text-neutral-500">
+                    {deploying ? (
+                      <>
+                        <BarsSpinner size={18} />
+                        <p className="text-xs text-neutral-300">Starting deployment and streaming logs...</p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-xs text-neutral-400">No deployment logs yet</p>
+                        <p className="text-[11px] max-w-sm">
+                          Click <span className="text-neutral-200">{deploymentsList.length > 0 ? "Re-deploy" : "Deploy"}</span> above to run a production deploy and stream logs.
+                        </p>
+                      </>
+                    )}
                   </div>
                 ) : (
                   deploymentLogs.map((log) => (
