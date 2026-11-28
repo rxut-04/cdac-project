@@ -1829,8 +1829,9 @@ export function RepoFileExplorer({
 
               <div className="flex-1 overflow-auto p-1.5">
                 <FileTree
+                  key={searchQuery.trim() ? "searching" : "collapsed"}
                   nodes={treeNodes}
-                  defaultExpanded={true}
+                  defaultExpanded={searchQuery.trim() ? true : []}
                   selected={selectedPath}
                   onSelectedChange={(path, node) => {
                     if (!node.children) {
