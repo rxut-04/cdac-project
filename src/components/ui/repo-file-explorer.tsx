@@ -531,6 +531,13 @@ export function RepoFileExplorer({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [projectAnalysis, setProjectAnalysis] = useState<any | null>(null);
   const [analyzingProject, setAnalyzingProject] = useState(false);
+  const deployLogRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (deployLogRef.current) {
+      deployLogRef.current.scrollTop = deployLogRef.current.scrollHeight;
+    }
+  }, [deploymentLogs]);
   const [troubleshootMessages, setTroubleshootMessages] = useState<ThreadMessage[]>([]);
   const [troubleshootInput, setTroubleshootInput] = useState("");
   const [troubleshootLoading, setTroubleshootLoading] = useState(false);
@@ -659,10 +666,24 @@ export function RepoFileExplorer({
     try {
       const res = await repoApi.triggerDeployment(ownerUsername, currentRepoName, currentBranch);
       setActiveDeployment(res.deployment);
-      setDeploymentLogs(res.logs || []);
       setDeploymentsList((prev) => [res.deployment, ...prev.filter((d) => d.id !== res.deployment.id)]);
+      const allLogs = Array.isArray(res.logs) ? res.logs : [];
+      if (allLogs.length > 10) {
+        setDeploymentLogs([]);
+        let idx = 0;
+        const step = () => {
+          idx = Math.min(allLogs.length, idx + 3);
+          setDeploymentLogs(allLogs.slice(0, idx));
+          if (idx < allLogs.length) {
+            window.setTimeout(step, 18);
+          }
+        };
+        step();
+      } else {
+        setDeploymentLogs(allLogs);
+      }
       if (res.deployment?.status === "FAILED") {
-        runTroubleshooter(res.deployment, res.logs || []);
+        runTroubleshooter(res.deployment, allLogs);
       }
     } catch (err: any) {
       alert(`Deploy failed: ${err?.response?.data?.error || err?.message || "Unknown error"}`);
@@ -2936,164 +2957,137 @@ export function RepoFileExplorer({
         </div>
       )}
 
-      {/* TAB 5: DEPLOYMENTS (mygit Pages + Big Live Logs + AI Troubleshooter) */}
+      {/* TAB 5: DEPLOYMENTS (Minimalist Netlify-style Deployments & Streaming Logs) */}
       {activeTab === "deployments" && (
-        <div className="space-y-5">
-          {/* Top Action & Status Bar */}
-          <div className="p-5 rounded-xl border border-border/50 bg-foreground/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2.5">
-                <Rocket className="size-4 text-emerald-400" />
-                <h2 className="text-base font-bold text-foreground">mygit Pages Deployments</h2>
-                {activeDeployment && (
-                  <span
-                    className={`text-[10px] font-mono px-2 py-0.5 rounded-full border ${
-                      activeDeployment.status === "LIVE"
-                        ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
-                        : activeDeployment.status === "FAILED"
-                        ? "bg-red-500/15 text-red-400 border-red-500/30"
-                        : "bg-amber-500/15 text-amber-400 border-amber-500/30"
-                    }`}
-                  >
-                    {activeDeployment.status}
-                  </span>
+        <div className="space-y-4">
+          {/* Minimalist Overview Header */}
+          <div className="rounded-lg border border-border/50 bg-foreground/[0.02] divide-y divide-border/40">
+            <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="space-y-1 min-w-0">
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <span className="text-sm font-semibold text-foreground">Production</span>
+                  <span className="text-xs font-mono text-foreground/45">· {currentBranch}</span>
+                  {activeDeployment && (
+                    <span className="inline-flex items-center gap-1.5 text-xs font-mono text-foreground/75">
+                      <span
+                        className={`size-1.5 rounded-full ${
+                          activeDeployment.status === "LIVE"
+                            ? "bg-emerald-400"
+                            : activeDeployment.status === "FAILED"
+                            ? "bg-red-400"
+                            : "bg-amber-400"
+                        }`}
+                      />
+                      <span>{activeDeployment.status === "LIVE" ? "Published" : activeDeployment.status}</span>
+                    </span>
+                  )}
+                  {!analyzingProject && projectAnalysis?.projectType && (
+                    <span className="text-[11px] font-mono text-foreground/50">
+                      · {projectAnalysis.projectType}
+                      {projectAnalysis.entryPath ? ` (${projectAnalysis.entryPath})` : ""}
+                    </span>
+                  )}
+                  {analyzingProject && (
+                    <span className="inline-flex items-center gap-1.5 text-[11px] font-mono text-foreground/50">
+                      <BarsSpinner size={12} />
+                      <span>Detecting project...</span>
+                    </span>
+                  )}
+                </div>
+
+                {!analyzingProject && projectAnalysis && !projectAnalysis.deployable && (
+                  <p className="text-xs text-amber-300/90 font-mono pt-0.5">
+                    {projectAnalysis.reason}
+                    {projectAnalysis.suggestedFix ? ` — ${projectAnalysis.suggestedFix}` : ""}
+                  </p>
                 )}
               </div>
-              <p className="text-xs font-mono text-foreground/55">
-                Automatically detects static HTML, prebuilt React/Vite (<code>dist/</code>, <code>build/</code>, <code>out/</code>), or missing entry points with live log streaming.
-              </p>
-            </div>
 
-            <div className="flex items-center gap-2 shrink-0 flex-wrap">
-              {activeDeployment?.status === "LIVE" && activeDeployment?.liveUrl && (
-                <a
-                  href={`${backendOrigin}${activeDeployment.liveUrl}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-emerald-500/40 bg-emerald-500/15 text-emerald-400 text-xs font-mono font-semibold hover:bg-emerald-500/25 transition-colors"
-                >
-                  <ExternalLink className="size-3.5" />
-                  <span>Open Live Site</span>
-                </a>
-              )}
-              {isOwner && (
+              <div className="flex items-center gap-2 shrink-0 flex-wrap">
                 <button
                   type="button"
-                  onClick={handleDeployLive}
-                  disabled={deploying || analyzingProject || (projectAnalysis !== null && !projectAnalysis.deployable)}
-                  title={
-                    projectAnalysis && !projectAnalysis.deployable
-                      ? projectAnalysis.reason || "Project is not deployable yet"
-                      : "Deploy root index.html or compiled dist/build/out bundle"
-                  }
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-accent-pro text-white text-xs font-semibold hover:opacity-90 disabled:opacity-45 disabled:cursor-not-allowed transition-opacity"
+                  onClick={analyzeProjectForDeployment}
+                  disabled={analyzingProject}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-border/50 hover:bg-foreground/5 text-xs font-mono text-foreground/65 hover:text-foreground disabled:opacity-50 transition-colors"
                 >
-                  {deploying ? <BarsSpinner size={14} /> : <Rocket className="size-3.5" />}
-                  <span>{deploying ? "Deploying..." : "Deploy Live"}</span>
+                  {analyzingProject ? <BarsSpinner size={12} /> : <Sparkles className="size-3" />}
+                  <span>Re-scan</span>
                 </button>
-              )}
-            </div>
-          </div>
-
-          {/* AI Project Type Detector Gate */}
-          <div
-            className={`rounded-xl border px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-              analyzingProject
-                ? "border-border/50 bg-foreground/5"
-                : projectAnalysis?.deployable
-                ? "border-emerald-500/30 bg-emerald-500/5"
-                : "border-amber-500/35 bg-amber-500/5"
-            }`}
-          >
-            <div className="space-y-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <Sparkles className="size-3.5 text-accent-pro shrink-0" />
-                <span className="text-xs font-semibold text-foreground">
-                  {analyzingProject ? "AI Detecting Project Type..." : "AI Project Detector"}
-                </span>
-                {!analyzingProject && projectAnalysis?.projectType && (
-                  <span
-                    className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold border ${
-                      projectAnalysis.deployable
-                        ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
-                        : "bg-amber-500/15 text-amber-300 border-amber-500/30"
-                    }`}
+                {activeDeployment?.status === "LIVE" && activeDeployment?.liveUrl && (
+                  <a
+                    href={`${backendOrigin}${activeDeployment.liveUrl}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border/60 hover:bg-foreground/5 text-xs font-medium text-foreground transition-colors"
                   >
-                    {projectAnalysis.projectType}
-                  </span>
+                    <ExternalLink className="size-3.5" />
+                    <span>Visit site</span>
+                  </a>
                 )}
-                {!analyzingProject && projectAnalysis?.entryPath && (
-                  <span className="text-[11px] font-mono text-foreground/60">
-                    entry: <code>{projectAnalysis.entryPath}</code>
-                  </span>
+                {isOwner && (
+                  <button
+                    type="button"
+                    onClick={handleDeployLive}
+                    disabled={deploying || analyzingProject || (projectAnalysis !== null && !projectAnalysis.deployable)}
+                    title={
+                      projectAnalysis && !projectAnalysis.deployable
+                        ? projectAnalysis.reason || "Project is not deployable yet"
+                        : "Trigger production deploy"
+                    }
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-md bg-foreground text-background text-xs font-medium hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
+                  >
+                    {deploying ? <BarsSpinner size={13} /> : <Rocket className="size-3.5" />}
+                    <span>{deploying ? "Deploying..." : "Deploy"}</span>
+                  </button>
                 )}
               </div>
-              {!analyzingProject && projectAnalysis && (
-                <p className="text-xs text-foreground/70">
-                  {projectAnalysis.reason}
-                  {!projectAnalysis.deployable && projectAnalysis.suggestedFix ? (
-                    <span className="block mt-1 font-mono text-[11px] text-amber-300">
-                      Fix: {projectAnalysis.suggestedFix}
-                    </span>
-                  ) : null}
-                </p>
-              )}
             </div>
-            <button
-              type="button"
-              onClick={analyzeProjectForDeployment}
-              disabled={analyzingProject}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border/50 bg-foreground/5 hover:bg-foreground/10 text-[11px] font-mono text-foreground/80 shrink-0 disabled:opacity-50"
-            >
-              {analyzingProject ? <BarsSpinner size={13} /> : <Sparkles className="size-3" />}
-              <span>{analyzingProject ? "Scanning..." : "Re-scan"}</span>
-            </button>
+
+            {activeDeployment?.status === "LIVE" && activeDeployment?.liveUrl && (
+              <div className="px-4 py-2.5 flex items-center justify-between gap-3 text-xs font-mono">
+                <div className="flex items-center gap-2 min-w-0 text-foreground/70">
+                  <Globe className="size-3.5 text-foreground/45 shrink-0" />
+                  <a
+                    href={`${backendOrigin}${activeDeployment.liveUrl}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="hover:text-foreground hover:underline truncate"
+                  >
+                    {`${backendOrigin}${activeDeployment.liveUrl}`}
+                  </a>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(`${backendOrigin}${activeDeployment.liveUrl}`);
+                    setLiveUrlCopied(true);
+                    setTimeout(() => setLiveUrlCopied(false), 2000);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-2 py-1 rounded hover:bg-foreground/10 text-[11px] text-foreground/60 hover:text-foreground shrink-0 transition-colors"
+                >
+                  {liveUrlCopied ? <Check className="size-3 text-emerald-400" /> : <Copy className="size-3" />}
+                  <span>{liveUrlCopied ? "Copied" : "Copy"}</span>
+                </button>
+              </div>
+            )}
           </div>
 
-          {activeDeployment?.status === "LIVE" && activeDeployment?.liveUrl && (
-            <div className="flex items-center justify-between gap-3 rounded-lg border border-emerald-500/25 bg-emerald-500/5 px-3.5 py-2.5">
-              <div className="flex items-center gap-2 min-w-0">
-                <Globe className="size-4 text-emerald-400 shrink-0" />
-                <a
-                  href={`${backendOrigin}${activeDeployment.liveUrl}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-xs font-mono text-emerald-400 hover:underline truncate"
-                >
-                  {`${backendOrigin}${activeDeployment.liveUrl}`}
-                </a>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  navigator.clipboard.writeText(`${backendOrigin}${activeDeployment.liveUrl}`);
-                  setLiveUrlCopied(true);
-                  setTimeout(() => setLiveUrlCopied(false), 2000);
-                }}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-[11px] font-mono text-emerald-300 shrink-0 transition-colors"
-              >
-                {liveUrlCopied ? <Check className="size-3" /> : <Copy className="size-3" />}
-                <span>{liveUrlCopied ? "Copied" : "Copy URL"}</span>
-              </button>
-            </div>
-          )}
-
-          {/* Deployment History Pills */}
+          {/* Minimalist Deployment History Bar */}
           {deploymentsList.length > 0 && (
-            <div className="flex items-center gap-2 overflow-x-auto pb-1">
-              {deploymentsList.slice(0, 8).map((d) => (
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+              {deploymentsList.slice(0, 10).map((d) => (
                 <button
                   key={d.id}
                   type="button"
                   onClick={() => loadDeploymentWithStream(d)}
-                  className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-mono shrink-0 transition-colors ${
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-mono shrink-0 transition-colors ${
                     activeDeployment?.id === d.id
-                      ? "border-accent-pro/60 bg-accent-pro/10 text-foreground"
-                      : "border-border/50 bg-foreground/5 text-foreground/60 hover:text-foreground"
+                      ? "bg-foreground/10 text-foreground font-medium"
+                      : "text-foreground/50 hover:text-foreground hover:bg-foreground/5"
                   }`}
                 >
                   <span
-                    className={`size-2 rounded-full ${
+                    className={`size-1.5 rounded-full ${
                       d.status === "LIVE"
                         ? "bg-emerald-400"
                         : d.status === "FAILED"
@@ -3102,29 +3096,29 @@ export function RepoFileExplorer({
                     }`}
                   />
                   <span>#{d.id}</span>
-                  <span>· {d.framework}</span>
-                  <span>· {d.branch}</span>
+                  <span className="text-foreground/40">· {d.branch}</span>
                 </button>
               ))}
             </div>
           )}
 
-          {/* Big Live Logs Container + Automatic AI Troubleshooter on Error */}
+          {/* Deploy Log Terminal + AI Troubleshooter on Error */}
           <div
             className={`grid grid-cols-1 gap-4 ${
               activeDeployment?.status === "FAILED" ? "lg:grid-cols-[1.35fr_1fr]" : "grid-cols-1"
             }`}
           >
-            {/* Big Live Logs Container */}
-            <div className="rounded-xl border border-border/60 bg-[#07090e] text-neutral-200 overflow-hidden flex flex-col min-h-[460px] max-h-[640px] shadow-xl">
-              <div className="px-4 py-3 border-b border-neutral-800 bg-[#0e141d] flex items-center justify-between gap-2">
+            {/* Minimalist Netlify-style Deploy Log */}
+            <div className="rounded-lg border border-border/50 bg-[#0b0d12] text-neutral-300 overflow-hidden flex flex-col min-h-[500px] max-h-[680px]">
+              <div className="px-4 py-2.5 border-b border-neutral-800/80 flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 text-xs font-mono">
-                  <Terminal className="size-4 text-emerald-400" />
-                  <span className="font-semibold text-white">Live Deployment Logs</span>
+                  <Terminal className="size-3.5 text-neutral-400" />
+                  <span className="font-medium text-neutral-200">Deploy log</span>
                   {activeDeployment && (
-                    <span className="text-neutral-400">
-                      · #{activeDeployment.id} ({activeDeployment.framework})
+                    <span className="text-neutral-500">
+                      #{activeDeployment.id} · {activeDeployment.framework}
                       {activeDeployment.durationMs ? ` · ${activeDeployment.durationMs}ms` : ""}
+                      {deploymentLogs.length > 0 ? ` · ${deploymentLogs.length} lines` : ""}
                     </span>
                   )}
                 </div>
@@ -3133,52 +3127,41 @@ export function RepoFileExplorer({
                     type="button"
                     onClick={() => {
                       navigator.clipboard.writeText(
-                        deploymentLogs.map((l) => `[${l.level}] ${l.message}`).join("\n")
+                        deploymentLogs.map((l) => `${l.seq}: [${l.level}] ${l.message}`).join("\n")
                       );
                     }}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded border border-neutral-700 text-[11px] font-mono text-neutral-300 hover:text-white"
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-neutral-800 text-[11px] font-mono text-neutral-400 hover:text-neutral-200 transition-colors"
                   >
                     <Copy className="size-3" />
-                    <span>Copy logs</span>
+                    <span>Copy</span>
                   </button>
                 )}
               </div>
 
-              <div className="flex-1 overflow-y-auto p-4 font-mono text-xs space-y-2 leading-relaxed">
+              <div
+                ref={deployLogRef}
+                className="flex-1 overflow-y-auto px-4 py-3 font-mono text-[11.5px] leading-[1.6] space-y-0.5"
+              >
                 {deploymentLogs.length === 0 ? (
-                  <div className="h-full flex flex-col items-center justify-center text-center py-16 space-y-2 text-neutral-500">
-                    <Rocket className="size-8 opacity-40" />
-                    <p className="text-sm text-neutral-300 font-sans font-medium">No deployment logs yet</p>
-                    <p className="text-xs max-w-md">
-                      Click <span className="text-white font-semibold">Deploy Live</span> above to run project detection and stream live deployment logs.
+                  <div className="h-full flex flex-col items-center justify-center text-center py-20 space-y-2 text-neutral-500">
+                    <p className="text-xs text-neutral-400">No deployment logs yet</p>
+                    <p className="text-[11px] max-w-sm">
+                      Click <span className="text-neutral-200">Deploy</span> above to run a production deploy and stream logs.
                     </p>
                   </div>
                 ) : (
                   deploymentLogs.map((log) => (
-                    <div key={log.id || log.seq} className="flex items-start gap-3">
-                      <span className="text-neutral-600 select-none w-6 text-right shrink-0">{log.seq}</span>
-                      <span
-                        className={`px-1.5 py-0.2 rounded text-[10px] font-semibold shrink-0 ${
-                          log.level === "ERROR"
-                            ? "bg-red-500/20 text-red-400 border border-red-500/30"
-                            : log.level === "WARN"
-                            ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
-                            : log.level === "SUCCESS"
-                            ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                            : "bg-neutral-800 text-neutral-400 border border-neutral-700"
-                        }`}
-                      >
-                        {log.level}
-                      </span>
+                    <div key={log.id || log.seq} className="flex items-start gap-3 hover:bg-white/[0.02] px-1 rounded">
+                      <span className="text-neutral-600 select-none w-7 text-right shrink-0">{log.seq}</span>
                       <span
                         className={`break-words whitespace-pre-wrap ${
                           log.level === "ERROR"
-                            ? "text-red-300"
+                            ? "text-red-400"
                             : log.level === "SUCCESS"
-                            ? "text-emerald-300 font-semibold"
+                            ? "text-emerald-400 font-medium"
                             : log.level === "WARN"
-                            ? "text-amber-200"
-                            : "text-neutral-200"
+                            ? "text-amber-300"
+                            : "text-neutral-300"
                         }`}
                       >
                         {log.message}
