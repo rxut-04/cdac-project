@@ -776,12 +776,6 @@ export function RepoFileExplorer({
       .catch(() => {});
   }, [ownerUsername, currentRepoName]);
 
-  useEffect(() => {
-    if (activeTab === "deployments") {
-      analyzeProjectForDeployment();
-    }
-  }, [activeTab, ownerUsername, currentRepoName, currentBranch]);
-
   // Star & Fork states
   const [starred, setStarred] = useState(false);
   const [starCount, setStarCount] = useState(0);
@@ -942,6 +936,12 @@ export function RepoFileExplorer({
   const [currentBranch, setCurrentBranch] = useState<string>("main");
   const [branchDropdownOpen, setBranchDropdownOpen] = useState(false);
   const [branchSearch, setBranchSearch] = useState("");
+
+  useEffect(() => {
+    if (activeTab === "deployments") {
+      analyzeProjectForDeployment();
+    }
+  }, [activeTab, ownerUsername, currentRepoName, currentBranch]);
 
   // Commits & Commit Diff
   const [commits, setCommits] = useState<RepoCommitItem[]>([]);
