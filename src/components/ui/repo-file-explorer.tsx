@@ -525,6 +525,9 @@ export function RepoFileExplorer({
   const [deploymentLogs, setDeploymentLogs] = useState<any[]>([]);
   const [deploying, setDeploying] = useState(false);
   const [aiFixing, setAiFixing] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [projectAnalysis, setProjectAnalysis] = useState<any | null>(null);
+  const [analyzingProject, setAnalyzingProject] = useState(false);
   const [troubleshootMessages, setTroubleshootMessages] = useState<ThreadMessage[]>([]);
   const [troubleshootInput, setTroubleshootInput] = useState("");
   const [troubleshootLoading, setTroubleshootLoading] = useState(false);
@@ -744,6 +747,21 @@ export function RepoFileExplorer({
     }
   };
 
+  const analyzeProjectForDeployment = async () => {
+    setAnalyzingProject(true);
+    try {
+      const { data } = await api.get(
+        `/repos/${encodeURIComponent(ownerUsername)}/${encodeURIComponent(currentRepoName)}/deployments/analyze`,
+        { params: { branch: currentBranch } }
+      );
+      setProjectAnalysis(data);
+    } catch {
+      setProjectAnalysis(null);
+    } finally {
+      setAnalyzingProject(false);
+    }
+  };
+
   useEffect(() => {
     repoApi
       .listDeployments(ownerUsername, currentRepoName)
@@ -757,6 +775,12 @@ export function RepoFileExplorer({
       })
       .catch(() => {});
   }, [ownerUsername, currentRepoName]);
+
+  useEffect(() => {
+    if (activeTab === "deployments") {
+      analyzeProjectForDeployment();
+    }
+  }, [activeTab, ownerUsername, currentRepoName, currentBranch]);
 
   // Star & Fork states
   const [starred, setStarred] = useState(false);
@@ -2931,14 +2955,74 @@ export function RepoFileExplorer({
                 <button
                   type="button"
                   onClick={handleDeployLive}
-                  disabled={deploying}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-accent-pro text-white text-xs font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity"
+                  disabled={deploying || analyzingProject || (projectAnalysis !== null && !projectAnalysis.deployable)}
+                  title={
+                    projectAnalysis && !projectAnalysis.deployable
+                      ? projectAnalysis.reason || "Project is not deployable yet"
+                      : "Deploy root index.html or compiled dist/build/out bundle"
+                  }
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-accent-pro text-white text-xs font-semibold hover:opacity-90 disabled:opacity-45 disabled:cursor-not-allowed transition-opacity"
                 >
                   {deploying ? <Loader2 className="size-3.5 animate-spin" /> : <Rocket className="size-3.5" />}
                   <span>{deploying ? "Deploying..." : "Deploy Live"}</span>
                 </button>
               )}
             </div>
+          </div>
+
+          {/* AI Project Type Detector Gate */}
+          <div
+            className={`rounded-xl border px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+              analyzingProject
+                ? "border-border/50 bg-foreground/5"
+                : projectAnalysis?.deployable
+                ? "border-emerald-500/30 bg-emerald-500/5"
+                : "border-amber-500/35 bg-amber-500/5"
+            }`}
+          >
+            <div className="space-y-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Sparkles className="size-3.5 text-accent-pro shrink-0" />
+                <span className="text-xs font-semibold text-foreground">
+                  {analyzingProject ? "AI Detecting Project Type..." : "AI Project Detector"}
+                </span>
+                {!analyzingProject && projectAnalysis?.projectType && (
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold border ${
+                      projectAnalysis.deployable
+                        ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
+                        : "bg-amber-500/15 text-amber-300 border-amber-500/30"
+                    }`}
+                  >
+                    {projectAnalysis.projectType}
+                  </span>
+                )}
+                {!analyzingProject && projectAnalysis?.entryPath && (
+                  <span className="text-[11px] font-mono text-foreground/60">
+                    entry: <code>{projectAnalysis.entryPath}</code>
+                  </span>
+                )}
+              </div>
+              {!analyzingProject && projectAnalysis && (
+                <p className="text-xs text-foreground/70">
+                  {projectAnalysis.reason}
+                  {!projectAnalysis.deployable && projectAnalysis.suggestedFix ? (
+                    <span className="block mt-1 font-mono text-[11px] text-amber-300">
+                      Fix: {projectAnalysis.suggestedFix}
+                    </span>
+                  ) : null}
+                </p>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={analyzeProjectForDeployment}
+              disabled={analyzingProject}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border/50 bg-foreground/5 hover:bg-foreground/10 text-[11px] font-mono text-foreground/80 shrink-0 disabled:opacity-50"
+            >
+              {analyzingProject ? <Loader2 className="size-3 animate-spin" /> : <Sparkles className="size-3" />}
+              <span>{analyzingProject ? "Scanning..." : "Re-scan"}</span>
+            </button>
           </div>
 
           {activeDeployment?.status === "LIVE" && activeDeployment?.liveUrl && (
