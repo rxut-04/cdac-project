@@ -191,7 +191,7 @@ export default function DemoOne({
               <Signature
                 className="dark:invert-100"
                 text="My Git"
-                fontSize={15}
+                fontSize={12}
                 color="#1D1D1F"
               />
             </div>
