@@ -11,6 +11,7 @@ import {
 import { CodeBlock } from "@/components/ui/code-block";
 import { DiffViewer, FileDiff } from "@/components/ui/diff-viewer";
 import { ReasoningThread, type ThreadMessage } from "@/components/ui/reasoning-thread";
+import { Chart } from "@/components/chart";
 import {
   ArrowLeft,
   GitBranch,
@@ -51,7 +52,30 @@ import {
   Sparkles,
   Rocket,
   ExternalLink,
+  TrendingUp,
 } from "lucide-react";
+
+const GRAPH_DATA = [
+  369, 438, 417, 448, 531, 673, 625, 575, 610, 701, 746, 964, 970, 1180, 1072,
+  1348, 2286, 2481, 2875, 4703, 4339, 6468, 10234, 14156, 10221, 10398, 6974,
+  9241, 7494, 6404, 7780, 7038, 6626, 6318, 4017, 3743, 3458, 3855, 4105,
+  5351, 8575, 10817, 10086, 9631, 8294, 9200, 7570, 7194, 9351, 8600, 6439,
+  8659, 9461, 9138, 11323, 11681, 10784, 13781, 19626, 29002, 33114, 45138,
+  58919, 57750, 37333, 35041, 41626, 47167, 43791, 61319, 57005, 46306, 38483,
+  43193, 45539, 37715, 31792, 19785, 23337, 20050, 19432, 20496, 17169, 16547,
+  23139, 23147, 28478, 29269, 27220, 30477, 29230, 25931, 26968, 34668, 37713,
+  42265, 42583, 61198, 71334, 60637, 67491, 62678, 64619, 58970, 63330, 70215,
+  96449, 93429, 102405, 84373, 82549, 94207, 104638, 107135, 115758, 108237,
+  114056, 109556, 90394, 87509, 78621, 66996, 68233, 75776, 76454,
+];
+
+const GRAPH_START = new Date(2016, 0, 1).getTime();
+const GRAPH_END = new Date(2026, 3, 30).getTime();
+const GRAPH_LABELS = GRAPH_DATA.map((_, i) => {
+  const d = new Date(GRAPH_START + (i / (GRAPH_DATA.length - 1)) * (GRAPH_END - GRAPH_START));
+  const month = d.toLocaleDateString("en-US", { month: "short" });
+  return `${month} '${String(d.getFullYear()).slice(-2)}`;
+});
 
 export interface RepoFileExplorerProps {
   repoName: string;
@@ -513,8 +537,8 @@ export function RepoFileExplorer({
   const [editorMessage, setEditorMessage] = useState("");
   const [savingFile, setSavingFile] = useState(false);
 
-  // Navigation Tabs: "code" | "commits" | "pulls" | "issues" | "deployments" | "settings"
-  const [activeTab, setActiveTab] = useState<"code" | "commits" | "pulls" | "issues" | "deployments" | "settings">("code");
+  // Navigation Tabs: "code" | "commits" | "pulls" | "issues" | "deployments" | "graph" | "settings"
+  const [activeTab, setActiveTab] = useState<"code" | "commits" | "pulls" | "issues" | "deployments" | "graph" | "settings">("code");
 
   // Deployments & AI Troubleshooter State
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1727,7 +1751,26 @@ export function RepoFileExplorer({
               </span>
             </button>
 
-            {/* 6th Tab: Settings (Owner only) */}
+            {/* 6th Tab: Graph */}
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab("graph");
+                setSelectedCommitSha(null);
+                setSelectedPrNumber(null);
+                setSelectedIssueNumber(null);
+              }}
+              className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs font-medium transition-all ${
+                activeTab === "graph"
+                  ? "bg-foreground/15 text-foreground shadow-xs font-semibold"
+                  : "text-foreground/60 hover:text-foreground"
+              }`}
+            >
+              <TrendingUp className="size-3.5 text-sky-400" />
+              <span>Graph</span>
+            </button>
+
+            {/* 7th Tab: Settings (Owner only) */}
             {isOwner && (
               <button
                 type="button"
@@ -3225,7 +3268,27 @@ export function RepoFileExplorer({
         </div>
       )}
 
-      {/* TAB 6: REPOSITORY SETTINGS & DANGER ZONE */}
+      {/* TAB 6: GRAPH */}
+      {activeTab === "graph" && (
+        <div className="space-y-6 animate-in fade-in duration-150">
+          <div className="rounded-xl border border-border/50 bg-foreground/5 p-6">
+            <Chart
+              data={GRAPH_DATA}
+              labels={GRAPH_LABELS}
+              name="BTC / USD"
+              formatValue={(v) =>
+                v.toLocaleString("en-US", {
+                  style: "currency",
+                  currency: "USD",
+                  maximumFractionDigits: 0,
+                })
+              }
+            />
+          </div>
+        </div>
+      )}
+
+      {/* TAB 7: REPOSITORY SETTINGS & DANGER ZONE */}
       {activeTab === "settings" && (
         <div className="space-y-8 animate-in fade-in duration-150">
           {/* Header */}
