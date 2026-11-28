@@ -20,7 +20,6 @@ type SignatureFont = {
   charToGlyph: (char: string) => SignatureGlyph;
 };
 
-const SVG_HEIGHT = 100;
 const PATH_DELAY_STEP = 0.2;
 const OPACITY_DELAY_OFFSET = 0.01;
 const fontCache = new Map<string, SignatureFont>();
@@ -172,9 +171,9 @@ export function Signature({
 }: SignatureProps) {
   const [paths, setPaths] = useState<string[]>([]);
   const [width, setWidth] = useState<number>(300);
-  const horizontalPadding = fontSize * 0.1;
-  const topMargin = Math.max(5, (SVG_HEIGHT - fontSize) / 2);
-  const baseline = Math.min(SVG_HEIGHT - 5, topMargin + fontSize);
+  const svgHeight = Math.max(32, Math.ceil(fontSize * 2));
+  const horizontalPadding = fontSize * 0.15;
+  const baseline = Math.round((svgHeight + fontSize * 0.72) / 2);
   const maskId = `signature-reveal-${useId().replace(/:/g, "")}`;
 
   useEffect(() => {
@@ -216,8 +215,8 @@ export function Signature({
     <motion.svg
       key={paths.length}
       width={width}
-      height={SVG_HEIGHT}
-      viewBox={`0 0 ${width} ${SVG_HEIGHT}`}
+      height={svgHeight}
+      viewBox={`0 0 ${width} ${svgHeight}`}
       fill="none"
       className={className}
       initial="hidden"
