@@ -1252,7 +1252,12 @@ export function DashboardPage({
             </div>
 
             {/* Repositories List */}
-            {filteredRepos.length === 0 ? (
+            {syncStatus === "loading" && filteredRepos.length === 0 ? (
+              <div className="p-12 rounded-xl border border-border/50 bg-foreground/5 flex flex-col items-center justify-center gap-3 text-xs font-mono text-foreground/60">
+                <BarsSpinner size={20} />
+                <span>Loading your repositories...</span>
+              </div>
+            ) : filteredRepos.length === 0 ? (
               <div className="p-12 text-center rounded-xl border border-border/50 bg-foreground/5 space-y-3">
                 <FolderPlus className="size-8 text-foreground/40 mx-auto" />
                 <h3 className="text-sm font-semibold text-foreground">No repositories found</h3>
@@ -1849,7 +1854,13 @@ export function DashboardPage({
             </div>
 
             <div className="space-y-2.5">
-              {repos.map((repo) => (
+              {syncStatus === "loading" && repos.length === 0 ? (
+                <div className="p-10 rounded-xl border border-border/50 bg-foreground/5 flex items-center justify-center gap-3 text-xs font-mono text-foreground/60">
+                  <BarsSpinner size={18} />
+                  <span>Loading recent repositories...</span>
+                </div>
+              ) : (
+                repos.map((repo) => (
                 <div
                   key={repo.id}
                   className="p-4 rounded-xl border border-border/50 bg-foreground/5 flex items-center justify-between gap-4"
@@ -1875,7 +1886,8 @@ export function DashboardPage({
                     <ExternalLink className="size-3" />
                   </button>
                 </div>
-              ))}
+              ))
+              )}
             </div>
           </div>
         );
@@ -3312,6 +3324,12 @@ export function DashboardPage({
                   </button>
                 </div>
 
+                {syncStatus === "loading" && repos.length === 0 ? (
+                  <div className="p-10 rounded-lg border border-border/50 bg-foreground/5 flex items-center justify-center gap-3 text-xs font-mono text-foreground/60">
+                    <BarsSpinner size={18} />
+                    <span>Loading recent repositories...</span>
+                  </div>
+                ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {repos.slice(0, 4).map((repo) => (
                     <div
@@ -3365,6 +3383,7 @@ export function DashboardPage({
                     </div>
                   ))}
                 </div>
+                )}
               </div>
 
               {/* Activity mini column */}
