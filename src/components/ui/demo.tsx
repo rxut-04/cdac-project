@@ -173,7 +173,7 @@ export default function DemoOne({
     <div className="relative min-h-screen w-full flex flex-col bg-[#f8f9f5] dark:bg-[#07090e] bg-[linear-gradient(to_right,#e5e7eb_1px,transparent_1px),linear-gradient(to_bottom,#e5e7eb_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,#1b202c_1px,transparent_1px),linear-gradient(to_bottom,#1b202c_1px,transparent_1px)] bg-[size:24px_24px] text-neutral-900 dark:text-neutral-100 transition-colors duration-300 overflow-x-hidden">
       
       {/* Modern Top Navbar */}
-      <header className="sticky top-0 z-40 w-full px-4 sm:px-8 lg:px-12 py-3 bg-white/80 dark:bg-neutral-950/80 backdrop-blur-md border-b border-neutral-200/80 dark:border-neutral-800/80 flex items-center justify-between gap-4">
+      <header className="sticky top-0 z-40 w-full px-4 sm:px-8 lg:px-12 py-3.5 bg-white/80 dark:bg-neutral-950/80 backdrop-blur-md border-b border-neutral-200/80 dark:border-neutral-800/80 flex items-center justify-between gap-4">
         <div className="flex flex-1 items-center justify-start gap-3">
           <MobileNav nav={navigationLinks} />
 
@@ -187,11 +187,11 @@ export default function DemoOne({
             className="flex items-center group select-none cursor-pointer shrink-0"
             title="My Git"
           >
-            <div className="flex items-center justify-center">
+            <div className="flex items-center justify-center py-0.5">
               <Signature
                 className="dark:invert-100"
                 text="My Git"
-                fontSize={12}
+                fontSize={14}
                 color="#1D1D1F"
               />
             </div>

@@ -171,9 +171,9 @@ export function Signature({
 }: SignatureProps) {
   const [paths, setPaths] = useState<string[]>([]);
   const [width, setWidth] = useState<number>(300);
-  const svgHeight = Math.max(32, Math.ceil(fontSize * 2.5));
-  const horizontalPadding = fontSize * 0.2;
-  const baseline = Math.round(svgHeight * 0.68);
+  const svgHeight = Math.max(44, Math.ceil(fontSize * 3));
+  const horizontalPadding = fontSize * 0.25;
+  const baseline = Math.round(svgHeight * 0.62);
   const maskId = `signature-reveal-${useId().replace(/:/g, "")}`;
 
   useEffect(() => {
@@ -218,6 +218,7 @@ export function Signature({
       height={svgHeight}
       viewBox={`0 0 ${width} ${svgHeight}`}
       fill="none"
+      style={{ overflow: "visible" }}
       className={className}
       initial="hidden"
       whileInView={inView ? "visible" : undefined}
